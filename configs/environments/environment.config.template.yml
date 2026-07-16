@@ -1,0 +1,26 @@
+configuration:
+  abstraction: env-file
+  precedence:
+    - secrets_runtime
+    - env_template
+    - docker_compose_defaults
+
+  environments:
+    development:
+      template: configs/environments/.env.development.template
+      debug: true
+    staging:
+      template: configs/environments/.env.staging.template
+      debug: false
+    production:
+      template: configs/environments/.env.production.template
+      debug: false
+
+  validation:
+    required_keys_file: configs/environments/required-env-keys.txt
+    fail_on_missing_keys: true
+
+  secret_injection:
+    enabled: true
+    template: configs/secrets/secrets.template.env
+    provider: placeholder

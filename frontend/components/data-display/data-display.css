@@ -1,0 +1,136 @@
+.dd-root {
+  font-family: var(--font-family-sans);
+  color: var(--color-text-primary);
+}
+
+.dd-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+
+.dd-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 40rem;
+}
+
+.dd-table th,
+.dd-table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: middle;
+}
+
+.dd-table thead th {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  background: var(--color-bg-muted);
+}
+
+.dd-table tbody tr:hover {
+  background: var(--color-bg-muted);
+}
+
+.dd-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.dd-pagination-pages {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.dd-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-md);
+}
+
+.dd-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-bg-surface) 65%, transparent), transparent);
+  animation: dd-skeleton-slide 1.25s infinite;
+}
+
+@keyframes dd-skeleton-slide {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.dd-state {
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: grid;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.dd-state-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--color-text-primary);
+}
+
+.dd-state-description {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.dd-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.dd-timeline-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+}
+
+.dd-timeline-marker {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-action-primary-bg);
+  margin-top: 0.35rem;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-action-primary-bg) 20%, transparent);
+}
+
+.dd-timeline-content {
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.dd-timeline-title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+}
+
+.dd-timeline-meta {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}

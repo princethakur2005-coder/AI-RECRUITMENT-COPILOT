@@ -1,0 +1,51 @@
+deployment:
+  mode: provider-agnostic
+  strategy:
+    type: rolling
+    zero_downtime_placeholder: true
+    max_unavailable: 0
+    max_surge: 1
+
+  stages:
+    - name: pre_deploy
+      actions:
+        - validate_environment_template
+        - pull_build_artifacts
+        - inject_runtime_secrets_placeholder
+
+    - name: deploy
+      actions:
+        - apply_docker_stack_placeholder
+        - update_backend_service_image_placeholder
+        - update_frontend_service_image_placeholder
+        - preserve_persistent_volumes
+
+    - name: verify
+      actions:
+        - check_nginx_health_placeholder
+        - check_backend_liveness_placeholder
+        - check_backend_readiness_placeholder
+        - smoke_test_placeholder
+
+    - name: rollback
+      trigger: on_verification_failure
+      actions:
+        - restore_previous_backend_image_placeholder
+        - restore_previous_frontend_image_placeholder
+        - reapply_previous_runtime_env_placeholder
+
+  verification:
+    required_endpoints:
+      - /nginx-health
+      - /health/live
+      - /health/ready
+
+  rollback:
+    enabled: true
+    max_attempts: 1
+
+  readiness:
+    docker_stack_required: true
+    nginx_required: true
+    redis_required: true
+    observability_required: true

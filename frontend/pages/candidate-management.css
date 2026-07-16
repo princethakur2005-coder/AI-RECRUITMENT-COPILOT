@@ -1,0 +1,63 @@
+.candidate-management-page {
+  min-height: 100dvh;
+  background: var(--color-bg-canvas);
+}
+
+.candidate-management-main {
+  padding-block: var(--space-6);
+}
+
+.candidate-management-title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+}
+
+.candidate-management-subtitle {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.candidate-management-toolbar {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (min-width: 1024px) {
+  .candidate-management-toolbar {
+    grid-template-columns: 2fr 1fr 1fr auto;
+    align-items: end;
+  }
+}
+
+.candidate-management-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.candidate-management-detail {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.candidate-management-resume-frame {
+  width: 100%;
+  min-height: 22rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+.candidate-management-meta-grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .candidate-management-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.tox/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+.venv-1/
+env/
+venv/
+*/venv/
+
+# Environment files
+.env
+.flaskenv
+
+# IDEs and editors
+.vscode/
+.vscode/settings.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+thumbs.db
+
+# FastAPI specific
+/.mypy_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Frontend generated files
+frontend/node_modules/
+frontend/.next/
+frontend/playwright-report/
+frontend/test-results/
+frontend/dist/
+
+# Coverage
+.coverage
+coverage/
+htmlcov/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log

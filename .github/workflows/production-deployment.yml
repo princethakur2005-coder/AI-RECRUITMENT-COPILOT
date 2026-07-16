@@ -1,0 +1,246 @@
+name: Production Deployment Stack
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Target environment
+        required: true
+        default: staging
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: production-deployment-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BACKEND: ${{ github.repository }}-backend
+  IMAGE_FRONTEND: ${{ github.repository }}-frontend
+
+jobs:
+  prepare:
+    name: Prepare Config And Validate Environment
+    runs-on: ubuntu-latest
+    outputs:
+      env_name: ${{ steps.set_env.outputs.env_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve target environment
+        id: set_env
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "env_name=${{ github.event.inputs.target_environment }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "env_name=production" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate environment template exists
+        shell: bash
+        run: |
+          test -f "configs/environments/.env.${{ steps.set_env.outputs.env_name }}.template"
+
+      - name: Validate required environment keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          TEMPLATE="configs/environments/.env.${{ steps.set_env.outputs.env_name }}.template"
+          while IFS= read -r key; do
+            [ -z "$key" ] && continue
+            grep -qE "^${key}=" "$TEMPLATE"
+          done < configs/environments/required-env-keys.txt
+
+      - name: Build runtime environment file (placeholder)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "configs/environments/.env.${{ steps.set_env.outputs.env_name }}.template" .env.runtime
+          sed -i "s|SECRET_KEY=__REPLACE_IN_SECRET_STORE__|SECRET_KEY=${{ secrets.SECRET_KEY || '__MISSING__' }}|" .env.runtime
+          sed -i "s|POSTGRES_PASSWORD=__REPLACE_IN_SECRET_STORE__|POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD || '__MISSING__' }}|" .env.runtime
+          sed -i "s|REDIS_PASSWORD=__REPLACE_IN_SECRET_STORE__|REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD || '__MISSING__' }}|" .env.runtime
+
+      - name: Upload environment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-env-${{ steps.set_env.outputs.env_name }}
+          path: .env.runtime
+          retention-days: 7
+
+  build_backend:
+    name: Build Backend Image
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to registry (placeholder)
+        if: ${{ secrets.GITHUB_TOKEN != '' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build backend image with cache
+        id: backend_build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Export backend build metadata artifact
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          printf '{"image":"%s/%s:%s","digest":"%s"}\n' "${{ env.REGISTRY }}" "${{ env.IMAGE_BACKEND }}" "${{ github.sha }}" "${{ steps.backend_build.outputs.digest }}" > artifacts/backend-image.json
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-build-artifact
+          path: artifacts/backend-image.json
+          retention-days: 14
+
+  build_frontend:
+    name: Build Frontend Image
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to registry (placeholder)
+        if: ${{ secrets.GITHUB_TOKEN != '' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build frontend image with cache
+        id: frontend_build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Export frontend build metadata artifact
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          printf '{"image":"%s/%s:%s","digest":"%s"}\n' "${{ env.REGISTRY }}" "${{ env.IMAGE_FRONTEND }}" "${{ github.sha }}" "${{ steps.frontend_build.outputs.digest }}" > artifacts/frontend-image.json
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build-artifact
+          path: artifacts/frontend-image.json
+          retention-days: 14
+
+  package_release:
+    name: Package Deployment Bundle
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - build_backend
+      - build_frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release bundle
+        shell: bash
+        run: |
+          mkdir -p release-bundle
+          cp docker-compose.yml release-bundle/
+          cp -r infrastructure/docker/nginx release-bundle/nginx
+          cp -r infrastructure/docker/redis release-bundle/redis
+          cp configs/deployment/production-deployment.template.yml release-bundle/
+          cp configs/secrets/secrets.template.env release-bundle/
+          cp artifacts/backend-build-artifact/backend-image.json release-bundle/
+          cp artifacts/frontend-build-artifact/frontend-image.json release-bundle/
+
+      - name: Upload deployment bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-deployment-bundle
+          path: release-bundle
+          retention-days: 30
+
+  deploy_placeholder:
+    name: Deployment Stage Placeholder
+    runs-on: ubuntu-latest
+    needs: package_release
+    environment:
+      name: ${{ needs.prepare.outputs.env_name }}
+    steps:
+      - name: Download deployment bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: production-deployment-bundle
+          path: release-bundle
+
+      - name: Zero-downtime deployment placeholder
+        shell: bash
+        run: |
+          echo "[placeholder] Execute blue/green or rolling strategy using release-bundle assets"
+          echo "[placeholder] Inject environment secrets from target secret manager"
+
+  verify_placeholder:
+    name: Deployment Verification Placeholder
+    runs-on: ubuntu-latest
+    needs: deploy_placeholder
+    steps:
+      - name: Verification placeholder
+        shell: bash
+        run: |
+          echo "[placeholder] Verify /health/live and /health/ready"
+          echo "[placeholder] Verify nginx /nginx-health and application smoke checks"
+
+  rollback_placeholder:
+    name: Rollback Placeholder
+    runs-on: ubuntu-latest
+    if: ${{ failure() }}
+    needs:
+      - deploy_placeholder
+      - verify_placeholder
+    steps:
+      - name: Rollback placeholder
+        shell: bash
+        run: |
+          echo "[placeholder] Revert to previous backend/frontend image tags"
+          echo "[placeholder] Reapply previous release bundle and env snapshot"

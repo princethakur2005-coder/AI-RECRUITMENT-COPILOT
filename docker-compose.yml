@@ -1,0 +1,125 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-recruitment-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ai_recruitment}
+      POSTGRES_USER: ${POSTGRES_USER:-ai_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ai_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_user} -d ${POSTGRES_DB:-ai_recruitment}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-recruitment-redis
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change-me}
+    command: ["sh", "-c", "redis-server /usr/local/etc/redis/redis.conf --requirepass \"$${REDIS_PASSWORD}\""]
+    volumes:
+      - ./infrastructure/docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis_data:/data
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-change-me} ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: ai-recruitment-backend:latest
+    container_name: ai-recruitment-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_HOST: 0.0.0.0
+      APP_PORT: ${BACKEND_PORT:-8000}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-ai_user}:${POSTGRES_PASSWORD:-ai_password}@postgres:5432/${POSTGRES_DB:-ai_recruitment}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-change-me}@redis:6379/0
+      REDIS_ENABLED: ${REDIS_ENABLED:-true}
+      REDIS_PREFIX: ${REDIS_PREFIX:-airc}
+      REDIS_CONNECT_TIMEOUT_SECONDS: ${REDIS_CONNECT_TIMEOUT_SECONDS:-3}
+      REDIS_SOCKET_TIMEOUT_SECONDS: ${REDIS_SOCKET_TIMEOUT_SECONDS:-3}
+      REDIS_HEALTHCHECK_TIMEOUT_SECONDS: ${REDIS_HEALTHCHECK_TIMEOUT_SECONDS:-2}
+      CACHE_DEFAULT_TTL_SECONDS: ${CACHE_DEFAULT_TTL_SECONDS:-600}
+      CACHE_MAX_LOCAL_ENTRIES: ${CACHE_MAX_LOCAL_ENTRIES:-2048}
+      JOB_QUEUE_PREFIX: ${JOB_QUEUE_PREFIX:-jobs}
+      DISTRIBUTED_LOCK_PREFIX: ${DISTRIBUTED_LOCK_PREFIX:-locks}
+      SESSION_CACHE_PREFIX: ${SESSION_CACHE_PREFIX:-sessions}
+      CACHE_INVALIDATION_PREFIX: ${CACHE_INVALIDATION_PREFIX:-invalidation}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_JSON: ${LOG_JSON:-true}
+      LOG_ROTATION_ENABLED: ${LOG_ROTATION_ENABLED:-false}
+      LOG_FILE_PATH: ${LOG_FILE_PATH:-/tmp/ai-recruitment-api.log}
+      LOG_ROTATION_MAX_BYTES: ${LOG_ROTATION_MAX_BYTES:-10485760}
+      LOG_ROTATION_BACKUP_COUNT: ${LOG_ROTATION_BACKUP_COUNT:-5}
+      REQUEST_ID_HEADER_NAME: ${REQUEST_ID_HEADER_NAME:-X-Request-ID}
+      METRICS_ENABLED: ${METRICS_ENABLED:-true}
+      HEALTHCHECK_ENABLE_DEPENDENCIES: ${HEALTHCHECK_ENABLE_DEPENDENCIES:-true}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      SECRET_KEY: ${SECRET_KEY:-change-me}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${BACKEND_PORT:-8000}/health/live || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: ai-recruitment-frontend:latest
+    container_name: ai-recruitment-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      FRONTEND_PORT: ${FRONTEND_PORT:-3000}
+      API_BASE_URL: ${API_BASE_URL:-http://backend:8000}
+      NODE_ENV: production
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${FRONTEND_PORT:-3000}/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  app_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: ai_recruitment_postgres_data
+  redis_data:
+    name: ai_recruitment_redis_data

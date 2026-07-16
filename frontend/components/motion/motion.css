@@ -1,0 +1,43 @@
+.motion-root {
+  will-change: transform, opacity;
+}
+
+.motion-fade {
+  opacity: 0;
+  transition: opacity var(--motion-duration, 220ms) ease;
+}
+
+.motion-fade[data-active="true"] {
+  opacity: 1;
+}
+
+.motion-slide-up {
+  opacity: 0;
+  transform: translateY(var(--motion-distance, 8px));
+  transition: transform var(--motion-duration, 240ms) ease, opacity var(--motion-duration, 240ms) ease;
+}
+
+.motion-slide-up[data-active="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.motion-scale {
+  opacity: 0;
+  transform: scale(var(--motion-scale-from, 0.96));
+  transition: transform var(--motion-duration, 220ms) ease, opacity var(--motion-duration, 220ms) ease;
+}
+
+.motion-scale[data-active="true"] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-fade,
+  .motion-slide-up,
+  .motion-scale {
+    transition-duration: 1ms;
+    transform: none;
+  }
+}

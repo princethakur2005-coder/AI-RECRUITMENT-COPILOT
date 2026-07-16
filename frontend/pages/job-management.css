@@ -1,0 +1,104 @@
+.job-management-page {
+  min-height: 100dvh;
+  background: var(--color-bg-canvas);
+}
+
+.job-management-main {
+  padding-block: var(--space-6);
+}
+
+.job-management-title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+}
+
+.job-management-subtitle {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.job-management-toolbar {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (min-width: 1024px) {
+  .job-management-toolbar {
+    grid-template-columns: 2fr 1fr 1fr auto;
+    align-items: end;
+  }
+}
+
+.job-management-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.job-management-panel {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.job-management-skills {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.job-management-skill-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.job-management-skill-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.job-management-skill-track {
+  width: 100%;
+  height: 0.625rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-muted);
+  overflow: hidden;
+}
+
+.job-management-skill-fill {
+  height: 100%;
+  background: var(--color-action-primary-bg);
+}
+
+.job-management-skill-value {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.job-management-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.job-management-form-grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .job-management-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .job-management-skill-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+}
