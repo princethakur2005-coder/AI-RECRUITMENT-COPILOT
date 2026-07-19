@@ -1,3 +1,4 @@
+import { authFetch } from "../lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -18,7 +19,7 @@ import {
   Table,
   Textarea,
 } from "../components";
-import "./user-profile.css";
+
 
 interface UserRecord {
   id: string;
@@ -66,7 +67,7 @@ export default function UserProfilePage() {
     setSuccess(null);
 
     try {
-      const response = await fetch(USERS_ENDPOINT, {
+      const response = await authFetch(USERS_ENDPOINT, {
         headers: {
           Accept: "application/json",
         },
@@ -112,7 +113,7 @@ export default function UserProfilePage() {
     setSuccess(null);
 
     try {
-      const response = await fetch(`${USERS_ENDPOINT}/${user.id}`, {
+      const response = await authFetch(`${USERS_ENDPOINT}/${user.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -288,3 +289,5 @@ export default function UserProfilePage() {
     </AppLayout>
   );
 }
+
+

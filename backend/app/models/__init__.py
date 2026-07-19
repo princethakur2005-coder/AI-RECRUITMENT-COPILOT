@@ -5,3 +5,4 @@ from app.models.offer import Offer
 from app.models.user import User
 
 __all__ = ["Candidate", "Job", "Note", "Offer", "User"]
+

@@ -1,7 +1,7 @@
 import type { HTMLAttributes } from "react";
 
 import { cx } from "../core/utils";
-import "./data-display.css";
+
 
 export interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
   width?: string;

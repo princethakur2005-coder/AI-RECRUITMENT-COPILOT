@@ -1,3 +1,4 @@
+import { authFetch } from "../lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -21,7 +22,7 @@ import {
   Stack,
   Table,
 } from "../components";
-import "./job-management.css";
+
 
 type JobStatus = "draft" | "open" | "paused" | "closed" | "archived" | string;
 
@@ -171,6 +172,7 @@ export default function JobManagementPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
+  const [showForm, setShowForm] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [formState, setFormState] = useState<JobFormState>(getInitialForm);
   const [formLoading, setFormLoading] = useState(false);
@@ -183,7 +185,7 @@ export default function JobManagementPage() {
     setError(null);
 
     try {
-      const response = await fetch(JOBS_ENDPOINT, { headers: { Accept: "application/json" } });
+      const response = await authFetch(JOBS_ENDPOINT, { headers: { Accept: "application/json" } });
       if (!response.ok) {
         throw new Error(`Failed to load jobs (${response.status})`);
       }
@@ -270,6 +272,17 @@ export default function JobManagementPage() {
     setFormMode("create");
     setFormState(getInitialForm());
     setFormError(null);
+    setShowForm(false);
+  };
+
+  const openCreateForm = () => {
+    setFormMode("create");
+    setFormState(getInitialForm());
+    setFormError(null);
+    setShowForm(true);
+    setTimeout(() => {
+      document.getElementById("job-form-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   };
 
   const startEdit = () => {
@@ -277,6 +290,7 @@ export default function JobManagementPage() {
 
     setFormMode("edit");
     setFormError(null);
+    setShowForm(true);
     setFormState({
       title: String(selectedJob.title ?? ""),
       description: String(selectedJob.description ?? ""),
@@ -285,6 +299,9 @@ export default function JobManagementPage() {
       employment_type: String(selectedJob.employment_type ?? ""),
       status: String(selectedJob.status ?? "open"),
     });
+    setTimeout(() => {
+      document.getElementById("job-form-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   };
 
   const createJob = async () => {
@@ -292,7 +309,7 @@ export default function JobManagementPage() {
     setFormError(null);
 
     try {
-      const response = await fetch(JOBS_ENDPOINT, {
+      const response = await authFetch(JOBS_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -308,6 +325,7 @@ export default function JobManagementPage() {
       const created = (await response.json()) as JobRecord;
       await loadJobs();
       setSelectedJobId(created.id);
+      setShowForm(false);
       resetForm();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Unable to create job");
@@ -323,7 +341,7 @@ export default function JobManagementPage() {
     setFormError(null);
 
     try {
-      const response = await fetch(`${JOBS_ENDPOINT}/${selectedJob.id}`, {
+      const response = await authFetch(`${JOBS_ENDPOINT}/${selectedJob.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -338,6 +356,7 @@ export default function JobManagementPage() {
 
       await loadJobs();
       setSelectedJobId(selectedJob.id);
+      setShowForm(false);
       resetForm();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Unable to update job");
@@ -347,7 +366,7 @@ export default function JobManagementPage() {
   };
 
   const deleteJob = async (jobId: string) => {
-    await fetch(`${JOBS_ENDPOINT}/${jobId}`, { method: "DELETE" });
+    await authFetch(`${JOBS_ENDPOINT}/${jobId}`, { method: "DELETE" });
   };
 
   const deleteSelected = async () => {
@@ -369,7 +388,7 @@ export default function JobManagementPage() {
 
     await Promise.all(
       ids.map((id) =>
-        fetch(`${JOBS_ENDPOINT}/${id}`, {
+        authFetch(`${JOBS_ENDPOINT}/${id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -387,7 +406,7 @@ export default function JobManagementPage() {
   const updateSelectedStatus = async (status: JobStatus) => {
     if (!selectedJob?.id) return;
 
-    await fetch(`${JOBS_ENDPOINT}/${selectedJob.id}`, {
+    await authFetch(`${JOBS_ENDPOINT}/${selectedJob.id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -440,7 +459,7 @@ export default function JobManagementPage() {
               <Button variant="secondary" size="sm" onClick={() => void loadJobs()}>
                 Refresh
               </Button>
-              <Button size="sm" onClick={resetForm}>
+              <Button size="sm" onClick={openCreateForm}>
                 New Job
               </Button>
               <Button size="sm" variant="secondary" disabled={!selectedJob} onClick={startEdit}>
@@ -689,73 +708,78 @@ export default function JobManagementPage() {
               </Section>
             </Grid>
 
-            <Section>
-              <Stack gap="3">
-                <strong>{formMode === "create" ? "Create Job" : "Edit Job"}</strong>
+          </Stack>
+        ) : null}
 
-                {formError ? <Alert tone="danger" title="Form error" description={formError} /> : null}
+        {showForm ? (
+          <Section id="job-form-section" style={{ marginTop: "var(--space-5)" }}>
+            <Stack gap="3">
+              <strong>{formMode === "create" ? "Create New Job" : "Edit Job"}</strong>
 
-                <FormWrapper
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    if (formMode === "create") {
-                      void createJob();
-                    } else {
-                      void updateJob();
-                    }
-                  }}
-                >
-                  <div className="job-management-form-grid">
-                    <Input
-                      label="Title"
-                      value={formState.title}
-                      onChange={(event) => setFormField("title", event.target.value)}
-                      required
-                    />
-                    <Input
-                      label="Department"
-                      value={formState.department}
-                      onChange={(event) => setFormField("department", event.target.value)}
-                    />
-                    <Input
-                      label="Location"
-                      value={formState.location}
-                      onChange={(event) => setFormField("location", event.target.value)}
-                    />
-                    <Select
-                      label="Employment Type"
-                      value={formState.employment_type}
-                      onChange={(event) => setFormField("employment_type", event.target.value)}
-                      options={EMPLOYMENT_OPTIONS}
-                    />
-                    <Select
-                      label="Status"
-                      value={formState.status}
-                      onChange={(event) => setFormField("status", event.target.value)}
-                      options={STATUS_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-                    />
-                  </div>
+              {formError ? <Alert tone="danger" title="Form error" description={formError} /> : null}
 
+              <FormWrapper
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (formMode === "create") {
+                    void createJob();
+                  } else {
+                    void updateJob();
+                  }
+                }}
+              >
+                <div className="job-management-form-grid">
                   <Input
-                    label="Description"
-                    value={formState.description}
-                    onChange={(event) => setFormField("description", event.target.value)}
-                    placeholder="Describe role scope, responsibilities, and outcomes"
+                    label="Title"
+                    value={formState.title}
+                    onChange={(event) => setFormField("title", event.target.value)}
                     required
                   />
-
-                  <FormActions
-                    submitting={formLoading}
-                    submitLabel={formMode === "create" ? "Create Job" : "Save Changes"}
-                    cancelLabel={formMode === "create" ? "Reset" : "Cancel Edit"}
-                    onCancel={resetForm}
+                  <Input
+                    label="Department"
+                    value={formState.department}
+                    onChange={(event) => setFormField("department", event.target.value)}
                   />
-                </FormWrapper>
-              </Stack>
-            </Section>
-          </Stack>
+                  <Input
+                    label="Location"
+                    value={formState.location}
+                    onChange={(event) => setFormField("location", event.target.value)}
+                  />
+                  <Select
+                    label="Employment Type"
+                    value={formState.employment_type}
+                    onChange={(event) => setFormField("employment_type", event.target.value)}
+                    options={EMPLOYMENT_OPTIONS}
+                  />
+                  <Select
+                    label="Status"
+                    value={formState.status}
+                    onChange={(event) => setFormField("status", event.target.value)}
+                    options={STATUS_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+                  />
+                </div>
+
+                <Input
+                  label="Description"
+                  value={formState.description}
+                  onChange={(event) => setFormField("description", event.target.value)}
+                  placeholder="Describe role scope, responsibilities, and outcomes"
+                  required
+                />
+
+                <FormActions
+                  submitting={formLoading}
+                  submitLabel={formMode === "create" ? "Create Job" : "Save Changes"}
+                  cancelLabel="Cancel"
+                  onCancel={resetForm}
+                />
+              </FormWrapper>
+            </Stack>
+          </Section>
         ) : null}
       </ContentContainer>
     </AppLayout>
   );
 }
+
+

@@ -1,7 +1,7 @@
 import type { HTMLAttributes } from "react";
 
 import { cx } from "../core/utils";
-import "./feedback.css";
+
 
 export interface ProgressProps extends HTMLAttributes<HTMLDivElement> {
   value: number;

@@ -14,17 +14,38 @@
 
 .recruiter-dashboard-nav {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .recruiter-dashboard-nav a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   text-decoration: none;
   font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition: color 120ms ease, background-color 120ms ease;
 }
 
 .recruiter-dashboard-nav a:hover {
   color: var(--color-text-primary);
+  background: var(--color-bg-muted);
+}
+
+.recruiter-dashboard-nav a:before {
+  content: "›";
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  transition: color 120ms ease, transform 120ms ease;
+  display: inline-block;
+}
+
+.recruiter-dashboard-nav a:hover:before {
+  color: var(--color-action-primary-bg);
+  transform: translateX(2px);
 }
 
 .recruiter-dashboard-title {

@@ -1,7 +1,7 @@
 import { forwardRef, useId } from "react";
 import type { InputHTMLAttributes } from "react";
 
-import "./core-ui.css";
+
 
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   label: string;

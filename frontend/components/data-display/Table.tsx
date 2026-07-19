@@ -1,6 +1,6 @@
 import type { ReactNode, TableHTMLAttributes } from "react";
 
-import "./data-display.css";
+
 import { cx } from "../core/utils";
 
 export interface TableColumn<T> {

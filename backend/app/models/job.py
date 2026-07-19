@@ -5,13 +5,14 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import Uuid
 
 from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.candidate import Candidate
+    from app.models.offer import Offer
     from app.models.user import User
 
 
@@ -21,13 +22,13 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True),
+        Uuid(as_uuid=True),
         primary_key=True,
         default=uuid4,
         nullable=False,
     )
     created_by_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id"),
         nullable=True,
         index=True,

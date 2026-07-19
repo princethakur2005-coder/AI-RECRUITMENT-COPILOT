@@ -1,6 +1,6 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
-import "./layout.css";
+
 import { cx } from "./utils";
 
 export interface HeaderProps extends HTMLAttributes<HTMLElement> {

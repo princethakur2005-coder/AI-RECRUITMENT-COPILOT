@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from "react";
 
-import "./core-ui.css";
+
 import type { UISize, UIStatusTone } from "./types";
 import { cx } from "./utils";
 

@@ -50,10 +50,10 @@
 
 .layout-header {
   position: sticky;
-  top: 0;
-  z-index: var(--z-sticky);
-  background: color-mix(in srgb, var(--color-bg-surface) 92%, transparent);
-  backdrop-filter: saturate(130%) blur(8px);
+  top: 3.5rem; /* sits below the global nav */
+  z-index: calc(var(--z-sticky) - 1);
+  background: color-mix(in srgb, var(--color-bg-canvas) 90%, transparent);
+  backdrop-filter: saturate(140%) blur(10px);
   border-bottom: 1px solid var(--color-border-subtle);
 }
 

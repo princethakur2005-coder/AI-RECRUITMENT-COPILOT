@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Spinner } from "../core/Spinner";
-import "./data-display.css";
+
 
 export interface LoadingStateProps {
   title?: string;

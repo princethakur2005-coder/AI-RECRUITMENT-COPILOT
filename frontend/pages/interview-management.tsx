@@ -1,3 +1,4 @@
+import { authFetch } from "../lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -26,7 +27,7 @@ import {
   Timeline,
   type TimelineItem,
 } from "../components";
-import "./interview-management.css";
+
 
 type InterviewStatus = "scheduled" | "in_progress" | "completed" | "cancelled" | "needs_review" | string;
 
@@ -377,7 +378,7 @@ export default function InterviewManagementPage() {
       };
 
       if (formMode === "create") {
-        const response = await fetch(INTERVIEWS_ENDPOINT, {
+        const response = await authFetch(INTERVIEWS_ENDPOINT, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -401,7 +402,7 @@ export default function InterviewManagementPage() {
         throw new Error("No selected interview to update");
       }
 
-      const response = await fetch(`${INTERVIEWS_ENDPOINT}/${selectedInterview.id}`, {
+      const response = await authFetch(`${INTERVIEWS_ENDPOINT}/${selectedInterview.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -424,7 +425,7 @@ export default function InterviewManagementPage() {
   };
 
   const deleteInterview = async (id: string) => {
-    await fetch(`${INTERVIEWS_ENDPOINT}/${id}`, { method: "DELETE" });
+    await authFetch(`${INTERVIEWS_ENDPOINT}/${id}`, { method: "DELETE" });
   };
 
   const deleteSelectedInterviews = async () => {
@@ -441,7 +442,7 @@ export default function InterviewManagementPage() {
   };
 
   const updateInterviewStatus = async (id: string, status: InterviewStatus) => {
-    await fetch(`${INTERVIEWS_ENDPOINT}/${id}`, {
+    await authFetch(`${INTERVIEWS_ENDPOINT}/${id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -463,7 +464,7 @@ export default function InterviewManagementPage() {
   const submitFeedback = async () => {
     if (!selectedInterview?.id) return;
 
-    await fetch(`${INTERVIEWS_ENDPOINT}/${selectedInterview.id}`, {
+    await authFetch(`${INTERVIEWS_ENDPOINT}/${selectedInterview.id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -483,7 +484,7 @@ export default function InterviewManagementPage() {
   const loadAiQuestions = async () => {
     if (!selectedInterview?.id) return;
 
-    await fetch(`${INTERVIEWS_ENDPOINT}/${selectedInterview.id}/ai-questions`, {
+    await authFetch(`${INTERVIEWS_ENDPOINT}/${selectedInterview.id}/ai-questions`, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -496,7 +497,7 @@ export default function InterviewManagementPage() {
   const pushMockResponse = async () => {
     if (!selectedInterview?.id) return;
 
-    await fetch(`${INTERVIEWS_ENDPOINT}/${selectedInterview.id}`, {
+    await authFetch(`${INTERVIEWS_ENDPOINT}/${selectedInterview.id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -897,3 +898,5 @@ export default function InterviewManagementPage() {
     </AppLayout>
   );
 }
+
+

@@ -1,6 +1,6 @@
 import type { ImgHTMLAttributes } from "react";
 
-import "./core-ui.css";
+
 import type { UISize } from "./types";
 import { cx, getInitials } from "./utils";
 

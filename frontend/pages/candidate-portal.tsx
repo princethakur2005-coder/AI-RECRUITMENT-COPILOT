@@ -1,3 +1,4 @@
+import { authFetch } from "../lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -30,7 +31,7 @@ import {
   Timeline,
   type TimelineItem,
 } from "../components";
-import "./candidate-portal.css";
+
 
 type Dict = Record<string, number>;
 
@@ -285,7 +286,7 @@ export default function CandidatePortalPage() {
     setResumeActionMessage(null);
 
     try {
-      const candidatesResponse = await fetch(API.candidates, {
+      const candidatesResponse = await authFetch(API.candidates, {
         headers: {
           Accept: "application/json",
         },
@@ -457,7 +458,7 @@ export default function CandidatePortalPage() {
         }
       })();
 
-      const response = await fetch(`${API.candidates}/${activeCandidateId}`, {
+      const response = await authFetch(`${API.candidates}/${activeCandidateId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -499,7 +500,7 @@ export default function CandidatePortalPage() {
     setResumeFeedbackLoading(true);
     setResumeFeedback("");
     try {
-      const response = await fetch(API.resumeFeedback, {
+      const response = await authFetch(API.resumeFeedback, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1060,3 +1061,5 @@ export default function CandidatePortalPage() {
     </AppLayout>
   );
 }
+
+

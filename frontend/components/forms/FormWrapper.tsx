@@ -1,7 +1,7 @@
 import type { FormHTMLAttributes } from "react";
 
 import { cx } from "../core/utils";
-import "./forms.css";
+
 
 export interface FormWrapperProps extends FormHTMLAttributes<HTMLFormElement> {
   columns?: 1 | 2 | 3;

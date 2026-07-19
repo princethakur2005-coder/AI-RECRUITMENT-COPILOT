@@ -4,9 +4,9 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import Uuid
 
 from app.db.base import Base
 
@@ -22,31 +22,31 @@ class Offer(Base):
     __tablename__ = "offers"
 
     id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True),
+        Uuid(as_uuid=True),
         primary_key=True,
         default=uuid4,
         nullable=False,
     )
     candidate_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("candidates.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     job_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("jobs.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
     created_by_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
     approved_by_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,

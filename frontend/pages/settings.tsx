@@ -1,3 +1,4 @@
+import { authFetch } from "../lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -19,7 +20,7 @@ import {
   Stack,
   Switch,
 } from "../components";
-import "./settings.css";
+
 
 interface WorkspaceRecord {
   id: string;
@@ -69,7 +70,7 @@ export default function SettingsPage() {
     setSuccess(null);
 
     try {
-      const listResponse = await fetch(WORKSPACES_ENDPOINT, {
+      const listResponse = await authFetch(WORKSPACES_ENDPOINT, {
         headers: {
           Accept: "application/json",
         },
@@ -135,7 +136,7 @@ export default function SettingsPage() {
     setSuccess(null);
 
     try {
-      const response = await fetch(`${WORKSPACES_ENDPOINT}/${workspace.id}`, {
+      const response = await authFetch(`${WORKSPACES_ENDPOINT}/${workspace.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -304,3 +305,5 @@ export default function SettingsPage() {
     </AppLayout>
   );
 }
+
+

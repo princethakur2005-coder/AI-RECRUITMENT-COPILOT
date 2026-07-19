@@ -1,3 +1,4 @@
+import { authFetch } from "../lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -20,7 +21,7 @@ import {
   Timeline,
   type TimelineItem,
 } from "../components";
-import "./candidate-management.css";
+
 
 type CandidateStatus =
   | "new"
@@ -173,7 +174,7 @@ export default function CandidateManagementPage() {
     setError(null);
 
     try {
-      const response = await fetch(CANDIDATES_ENDPOINT, {
+      const response = await authFetch(CANDIDATES_ENDPOINT, {
         headers: { Accept: "application/json" },
       });
 
@@ -314,7 +315,7 @@ export default function CandidateManagementPage() {
   };
 
   const updateCandidateStatus = async (candidateId: string, status: CandidateStatus) => {
-    await fetch(`${CANDIDATES_ENDPOINT}/${candidateId}`, {
+    await authFetch(`${CANDIDATES_ENDPOINT}/${candidateId}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -614,3 +615,5 @@ export default function CandidateManagementPage() {
     </AppLayout>
   );
 }
+
+

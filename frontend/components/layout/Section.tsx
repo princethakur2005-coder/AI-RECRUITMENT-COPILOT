@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from "react";
 
-import "./layout.css";
+
 import { cx } from "./utils";
 
 export interface SectionProps extends HTMLAttributes<HTMLElement> {

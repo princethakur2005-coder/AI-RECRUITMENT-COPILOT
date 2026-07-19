@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import "./layout.css";
+
 import { cx } from "./utils";
 
 export interface AppLayoutProps {

@@ -2,7 +2,7 @@ import type { HTMLAttributes } from "react";
 
 import { cx } from "../core/utils";
 import type { MotionBaseProps } from "./types";
-import "./motion.css";
+
 
 export interface MotionScaleProps extends MotionBaseProps, Omit<HTMLAttributes<HTMLElement>, "children"> {
   fromScale?: number;

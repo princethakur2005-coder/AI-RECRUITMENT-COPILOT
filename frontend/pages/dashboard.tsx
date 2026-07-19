@@ -1,3 +1,4 @@
+import { authFetch } from "../lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -22,7 +23,7 @@ import {
   Timeline,
   type TimelineItem,
 } from "../components";
-import "./dashboard.css";
+
 
 type Dict = Record<string, number>;
 
@@ -130,7 +131,7 @@ export default function RecruiterDashboardPage() {
     setError(null);
 
     try {
-      const response = await fetch(DASHBOARD_SUMMARY_ENDPOINT, {
+      const response = await authFetch(DASHBOARD_SUMMARY_ENDPOINT, {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -429,3 +430,5 @@ export default function RecruiterDashboardPage() {
     </AppLayout>
   );
 }
+
+

@@ -1,7 +1,7 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
 import { cx } from "../core/utils";
-import "./feedback.css";
+
 
 export type AlertTone = "neutral" | "success" | "warning" | "danger" | "info";
 

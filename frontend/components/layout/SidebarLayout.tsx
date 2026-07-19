@@ -1,6 +1,6 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
-import "./layout.css";
+
 import { cx } from "./utils";
 
 export interface SidebarLayoutProps extends HTMLAttributes<HTMLElement> {

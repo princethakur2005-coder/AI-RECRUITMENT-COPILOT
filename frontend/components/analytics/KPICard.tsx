@@ -4,7 +4,7 @@ import { Progress } from "../feedback/Progress";
 import { StatusIndicator, type StatusTone } from "../feedback/StatusIndicator";
 import { Card, CardBody } from "../surface/Card";
 import { cx } from "../core/utils";
-import "./analytics.css";
+
 
 export interface KPICardProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   label: ReactNode;

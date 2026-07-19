@@ -1,7 +1,7 @@
 import { cloneElement, isValidElement, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
-import "./surface.css";
+
 import { useStableId } from "./utils";
 
 export interface TooltipProps {

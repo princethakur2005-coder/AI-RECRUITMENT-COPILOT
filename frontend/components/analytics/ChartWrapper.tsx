@@ -2,7 +2,7 @@ import type { HTMLAttributes, ReactNode } from "react";
 
 import { Card, CardBody, CardHeader } from "../surface/Card";
 import { cx } from "../core/utils";
-import "./analytics.css";
+
 
 export interface ChartWrapperProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   title: ReactNode;

@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-import "./core-ui.css";
+
 
 export interface RadioOption {
   value: string;

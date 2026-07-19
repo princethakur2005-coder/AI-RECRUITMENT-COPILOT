@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Button } from "../core/Button";
-import "./data-display.css";
+
 
 export interface ErrorStateProps {
   title?: string;

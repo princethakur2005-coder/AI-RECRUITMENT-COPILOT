@@ -1,3 +1,4 @@
+import { authFetch } from "../lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -17,7 +18,7 @@ import {
   Stack,
   Table,
 } from "../components";
-import "./notifications.css";
+
 
 type NotificationPriority = "low" | "medium" | "high" | "urgent" | string;
 type NotificationCategory = "system" | "candidate" | "interview" | "offer" | "task" | string;
@@ -77,7 +78,7 @@ export default function NotificationsPage() {
     setError(null);
 
     try {
-      const response = await fetch(NOTIFICATIONS_ENDPOINT, {
+      const response = await authFetch(NOTIFICATIONS_ENDPOINT, {
         headers: {
           Accept: "application/json",
         },
@@ -153,7 +154,7 @@ export default function NotificationsPage() {
   }, [filtered, page, pageSize]);
 
   const patchNotification = async (id: string, payload: Record<string, unknown>) => {
-    await fetch(`${NOTIFICATIONS_ENDPOINT}/${id}`, {
+    await authFetch(`${NOTIFICATIONS_ENDPOINT}/${id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -352,3 +353,5 @@ export default function NotificationsPage() {
     </AppLayout>
   );
 }
+
+

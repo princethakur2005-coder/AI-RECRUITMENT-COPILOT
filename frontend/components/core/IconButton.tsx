@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-import "./core-ui.css";
+
 import type { UISize } from "./types";
 import { cx } from "./utils";
 

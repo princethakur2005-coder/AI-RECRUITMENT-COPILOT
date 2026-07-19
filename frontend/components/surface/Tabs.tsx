@@ -1,7 +1,7 @@
 import { createContext, useContext } from "react";
 import type { HTMLAttributes, ReactNode } from "react";
 
-import "./surface.css";
+
 import { cx, useControllableState, useStableId } from "./utils";
 
 interface TabsContextValue {

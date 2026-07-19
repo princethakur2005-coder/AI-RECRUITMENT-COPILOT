@@ -3,7 +3,7 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { Badge } from "../core/Badge";
 import { Card, CardBody } from "../surface/Card";
 import { cx } from "../core/utils";
-import "./analytics.css";
+
 
 export interface MetricCardProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   label: ReactNode;

@@ -1,6 +1,6 @@
 import type { CSSProperties, HTMLAttributes } from "react";
 
-import "./layout.css";
+
 import { cx, type SpaceToken, spaceVar } from "./utils";
 
 export interface DividerProps extends Omit<HTMLAttributes<HTMLHRElement>, "size"> {

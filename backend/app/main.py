@@ -40,6 +40,9 @@ from fastapi.exceptions import RequestValidationError
 
 configure_logging()
 
+# Import all models so Base.metadata is fully populated before create_all
+import app.models  # noqa: F401, E402
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.API_VERSION,
@@ -98,6 +101,14 @@ app.add_exception_handler(ExternalServiceError, external_service_exception_handl
 # Fallback handler for everything else
 app.add_exception_handler(Exception, core_unhandled_exception)
 app.add_exception_handler(404, http_exception_handler)
+
+
+@app.on_event("startup")
+def create_tables() -> None:
+    """Auto-create database tables on startup (dev/SQLite friendly)."""
+    from app.db.base import Base
+    from app.db.database import engine
+    Base.metadata.create_all(bind=engine)
 
 
 @app.get("/")

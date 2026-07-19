@@ -1,4 +1,5 @@
 export { AppLayout } from "./AppLayout";
+export { GlobalNav } from "./GlobalNav";
 export { ContentContainer } from "./ContentContainer";
 export { Divider } from "./Divider";
 export { Grid } from "./Grid";

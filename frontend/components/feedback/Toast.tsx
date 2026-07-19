@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { Button } from "../core/Button";
 import { cx, useControllableState } from "../surface/utils";
-import "./feedback.css";
+
 
 export interface ToastItem {
   id: string;

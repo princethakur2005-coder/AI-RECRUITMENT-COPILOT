@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import type { HTMLAttributes, ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-import "./surface.css";
+
 import { cx, useEscape, useStableId } from "./utils";
 
 export interface ModalProps {

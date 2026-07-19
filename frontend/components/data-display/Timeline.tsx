@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import "./data-display.css";
+
 
 export interface TimelineItem {
   id: string;

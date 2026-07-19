@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from "react";
 
-import "./surface.css";
+
 import { cx } from "./utils";
 
 export interface CardProps extends HTMLAttributes<HTMLElement> {

@@ -2,7 +2,7 @@ import type { HTMLAttributes } from "react";
 
 import { Button } from "../core/Button";
 import { cx } from "../core/utils";
-import "./forms.css";
+
 
 export interface FormActionsProps extends HTMLAttributes<HTMLDivElement> {
   submitLabel?: string;

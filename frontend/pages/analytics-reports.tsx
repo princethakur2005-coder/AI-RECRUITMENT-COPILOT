@@ -22,7 +22,7 @@ import {
   Table,
   Tabs,
 } from "../components";
-import "./analytics-reports.css";
+
 
 type Dict = Record<string, number>;
 type ReportType = "recruiter" | "candidate" | "job" | "interview" | "hiring";
