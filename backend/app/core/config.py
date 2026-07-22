@@ -108,7 +108,7 @@ class Settings(BaseSettings):
     EXTERNAL_SERVICE_TIMEOUT_SECONDS: int = 10
     EXTERNAL_SERVICE_RETRY_ATTEMPTS: int = 3
     EXTERNAL_SERVICE_RETRY_BACKOFF_FACTOR: float = 0.5
-    RESILIENCE_GRACEFUL_DEGRADATION_ENABLED: bool = True
+    RESILIENCE_GRACEFUL_DEGRADATION_ENABLED: bool = False
     ERROR_VERBOSITY: str = "minimal"  # one of: minimal, normal, verbose
     # Performance tuning
     COMPRESS_MIN_SIZE: int = 500

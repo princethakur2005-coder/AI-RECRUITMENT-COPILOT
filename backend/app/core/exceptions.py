@@ -106,11 +106,13 @@ def db_exception_handler(request: Request | None, exc: Exception) -> JSONRespons
         logger.warning("DB IntegrityError request_id=%s detail=%s", request_id, str(exc))
         content = _format_response("db_conflict", "Conflict writing to database", request_id, details=None)
         return JSONResponse(status_code=HTTP_409_CONFLICT, content=content)
+   
     if isinstance(exc, OperationalError):
-        logger.error("DB OperationalError request_id=%s detail=%s", request_id, str(exc))
+        print("FULL DB ERROR:", repr(exc))
+        logger.exception("DB OperationalError request_id=%s detail=%s", request_id, str(exc))
         content = _format_response("db_unavailable", "Database unavailable", request_id, details=None)
         return JSONResponse(status_code=HTTP_503_SERVICE_UNAVAILABLE, content=content)
-
+   
     # Fallback for unrecognized DB issues
     logger.exception("Unhandled DB exception request_id=%s", request_id)
     content = _format_response("db_error", "Database error", request_id, details=None)
