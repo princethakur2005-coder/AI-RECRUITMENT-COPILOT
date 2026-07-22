@@ -1,18 +1,41 @@
 import { useRouter } from "next/router";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 const NAV_LINKS = [
-  { href: "/dashboard", label: "Dashboard", icon: "⬛" },
-  { href: "/candidate-management", label: "Candidates", icon: "👤" },
-  { href: "/job-management", label: "Jobs", icon: "💼" },
-  { href: "/interview-management", label: "Interviews", icon: "🗓" },
-  { href: "/analytics-reports", label: "Analytics", icon: "📊" },
-  { href: "/notifications", label: "Notifications", icon: "🔔" },
-  { href: "/settings", label: "Settings", icon: "⚙️" },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/candidate-management", label: "Candidates" },
+  { href: "/job-management", label: "Jobs" },
+  { href: "/interview-management", label: "Interviews" },
+  { href: "/analytics-reports", label: "Analytics" },
+  { href: "/notifications", label: "Notifications" },
+  { href: "/settings", label: "Settings" },
 ];
 
 export function GlobalNav() {
   const router = useRouter();
+  const [userEmail, setUserEmail] = useState<string>("");
+
+  useEffect(() => {
+    // Decode email from JWT for display
+    try {
+      const token = localStorage.getItem("access_token");
+      if (token) {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        setUserEmail(String(payload.sub ?? ""));
+      }
+    } catch {
+      // ignore decode errors
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    void router.replace("/login");
+  };
+
+  // Initials from email
+  const initials = userEmail ? userEmail.charAt(0).toUpperCase() : "U";
 
   return (
     <nav className="gnav-root" aria-label="Main navigation">
@@ -63,9 +86,25 @@ export function GlobalNav() {
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
           </Link>
-          <Link href="/user-profile" className="gnav-avatar" aria-label="User profile">
-            <span>RC</span>
+
+          <Link href="/user-profile" className="gnav-avatar" aria-label="User profile" title={userEmail}>
+            <span>{initials}</span>
           </Link>
+
+          <button
+            type="button"
+            className="gnav-logout-btn"
+            onClick={handleLogout}
+            aria-label="Log out"
+            title="Log out"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            <span>Logout</span>
+          </button>
         </div>
       </div>
     </nav>
