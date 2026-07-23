@@ -4,8 +4,8 @@ export async function obtainAuthToken(baseUrl = process.env.E2E_BASE_URL || 'htt
   try {
     const res = await fetch(`${baseUrl}/api/test/token`, { method: 'POST' })
     if (res.ok) {
-      const body = await res.json()
-      return body.token as string
+      const body = (await res.json()) as { token?: string };
+      return body.token ?? null;
     }
   } catch (e) {
     // ignore

@@ -1,8 +1,13 @@
-import { rest } from 'msw'
+import { HttpResponse, http } from 'msw'
 
 // Basic placeholder handlers for API mocking in tests.
 export const handlers = [
-  rest.get('/api/health', (req, res, ctx) => {
-    return res(ctx.status(200), ctx.json({ status: 'ok' }))
+  http.get('/api/health', () => {
+    return new HttpResponse(JSON.stringify({ status: 'ok' }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
   }),
 ]

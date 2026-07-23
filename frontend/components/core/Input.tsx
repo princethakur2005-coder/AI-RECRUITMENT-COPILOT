@@ -8,11 +8,11 @@ import { cx } from "./utils";
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   hint?: string;
-  size?: UISize;
+  uiSize?: UISize;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { className, id, label, hint, size = "md", ...props },
+  { className, id, label, hint, uiSize = "md", ...props },
   ref,
 ) {
   const fallbackId = useId();
@@ -26,7 +26,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         {...props}
         ref={ref}
         id={inputId}
-        className={cx("ui-control ui-input ui-focus-ring", `ui-input-${size}`, className)}
+        className={cx("ui-control ui-input ui-focus-ring", `ui-input-${uiSize}`, className)}
         aria-describedby={hintId}
       />
       {hint ? <div className="ui-help" id={hintId}>{hint}</div> : null}

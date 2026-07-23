@@ -1,6 +1,4 @@
 import React, { ReactElement } from 'react'
-import { render } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
 
 import { themeProvider } from './lib/theme-provider'
 
@@ -18,16 +16,14 @@ export function ThemeTestWrapper({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-export function RouterTestWrapper({ children, route = '/' }: { children: React.ReactNode; route?: string }) {
-  return <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+export function RouterTestWrapper({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
 }
 
-export function renderWithProviders(ui: ReactElement, { route = '/' }: RenderOptions = {}) {
-  return render(
-    <ThemeTestWrapper>
-      <RouterTestWrapper route={route}>{ui}</RouterTestWrapper>
-    </ThemeTestWrapper>
+export function renderWithProviders(ui: ReactElement): ReactElement {
+  return React.createElement(
+    ThemeTestWrapper,
+    null,
+    React.createElement(RouterTestWrapper, null, ui),
   )
 }
-
-export * from '@testing-library/react'

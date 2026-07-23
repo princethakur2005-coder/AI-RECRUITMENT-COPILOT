@@ -11,7 +11,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential gcc \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./requirements.txt
+COPY backend/requirements.txt ./requirements.txt
 RUN python -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
     && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
@@ -33,9 +33,12 @@ RUN apt-get update \
     && adduser --system --ingroup appgroup appuser
 
 COPY --from=builder /opt/venv /opt/venv
-COPY ./app ./app
-COPY ./alembic ./alembic
-COPY ./alembic.ini ./alembic.ini
+COPY backend/app ./app
+COPY backend/alembic ./alembic
+COPY alembic.ini ./alembic.ini
+
+RUN mkdir -p /app/app/data \
+    && chown -R appuser:appgroup /app/app/data
 
 USER appuser
 

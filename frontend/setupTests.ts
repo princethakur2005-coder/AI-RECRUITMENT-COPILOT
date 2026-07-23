@@ -1,4 +1,6 @@
-import '@testing-library/jest-dom/extend-expect'
+declare function beforeAll(callback: () => void | Promise<void>): void
+declare function afterEach(callback: () => void | Promise<void>): void
+declare function afterAll(callback: () => void | Promise<void>): void
 
 // Start MSW server for tests
 import { server } from './mocks/server'

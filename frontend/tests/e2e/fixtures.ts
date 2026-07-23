@@ -13,8 +13,8 @@ export const test = base.extend<TestFixtures>({
     try {
       const res = await fetch(`${baseUrl}/api/test/token`, { method: 'POST' });
       if (res.ok) {
-        const body = await res.json();
-        await use(body.token as string);
+        const body = (await res.json()) as { token?: string };
+        await use(body.token ?? null);
         return;
       }
     } catch (e) {

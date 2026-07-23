@@ -8,7 +8,7 @@ import { cx } from "./utils";
 export interface PasswordInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   label?: string;
   hint?: string;
-  size?: UISize;
+  uiSize?: UISize;
   showToggleLabel?: string;
   hideToggleLabel?: string;
 }
@@ -19,7 +19,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(fu
     id,
     label,
     hint,
-    size = "md",
+    uiSize = "md",
     showToggleLabel = "Show password",
     hideToggleLabel = "Hide password",
     ...props
@@ -40,7 +40,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(fu
           ref={ref}
           id={inputId}
           type={visible ? "text" : "password"}
-          className={cx("ui-control ui-input ui-focus-ring", `ui-input-${size}`, className)}
+          className={cx("ui-control ui-input ui-focus-ring", `ui-input-${uiSize}`, className)}
           aria-describedby={hintId}
         />
         <button

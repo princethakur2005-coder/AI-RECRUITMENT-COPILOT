@@ -5,7 +5,7 @@ import { cx } from "../core/utils";
 
 export type AlertTone = "neutral" | "success" | "warning" | "danger" | "info";
 
-export interface AlertProps extends HTMLAttributes<HTMLDivElement> {
+export interface AlertProps extends Omit<HTMLAttributes<HTMLDivElement>, "title"> {
   title?: ReactNode;
   description?: ReactNode;
   tone?: AlertTone;

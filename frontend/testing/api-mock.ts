@@ -1,7 +1,12 @@
-import { rest } from 'msw'
+import { HttpResponse, http } from 'msw'
 
 export function jsonResponse(status: number, body: any) {
-  return (req: any, res: any, ctx: any) => res(ctx.status(status), ctx.json(body))
+  return () => new HttpResponse(JSON.stringify(body), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
 }
 
-export const mockGet = (url: string, body: any) => rest.get(url, jsonResponse(200, body))
+export const mockGet = (url: string, body: any) => http.get(url, jsonResponse(200, body))
