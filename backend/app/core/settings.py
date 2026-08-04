@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     DATABASE_URL: str
     DEBUG: bool = False
-    ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1"]
+    ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1", "testserver", "backend"]
     CORS_ORIGINS: List[str] = ["http://localhost", "http://127.0.0.1"]
     RATE_LIMIT_REQUESTS: int = 100
     RATE_LIMIT_WINDOW_SECONDS: int = 60

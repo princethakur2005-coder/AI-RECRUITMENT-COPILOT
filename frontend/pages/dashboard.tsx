@@ -2,10 +2,7 @@ import { authFetch } from "../lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
-  Alert,
-  AnalyticsWidget,
   AppLayout,
-  Badge,
   Button,
   ChartWrapper,
   ContentContainer,
@@ -13,108 +10,134 @@ import {
   ErrorState,
   Grid,
   Header,
-  KPICard,
   LoadingState,
   MetricCard,
   Section,
-  SidebarLayout,
   Stack,
   Table,
-  Timeline,
-  type TimelineItem,
 } from "../components";
 
-
-type Dict = Record<string, number>;
-
-interface DashboardResponse {
-  overview?: {
-    total_candidates?: number;
-    total_jobs?: number;
-    interview_sessions?: number;
-    hired?: number;
-    generated_at?: string;
-  };
-  candidate_metrics?: {
-    status_counts?: Dict;
-    total?: number;
-    recent_candidates?: Array<Record<string, unknown>>;
-  };
-  job_metrics?: {
-    status_counts?: Dict;
-    jobs_by_department?: Dict;
-    total?: number;
-  };
-  interview_metrics?: {
-    interview_events?: Dict;
-    average_interview_duration_minutes?: number;
-    interview_sessions?: number;
-  };
-  hiring_metrics?: {
-    hired?: number;
-    rejected?: number;
-    offers_in_progress?: number;
-    interviews_in_progress?: number;
-    screening_in_progress?: number;
-    new_candidates?: number;
-    total_candidates?: number;
-    hire_rate?: number;
-  };
-  recent_activity_summary?: {
-    items?: Array<Record<string, unknown>>;
-  };
-  notification_summary?: {
-    total?: number;
-    unread?: number;
-    read?: number;
-    high_priority?: number;
-  };
-  pipeline?: {
-    pipeline_stages?: Dict;
-    total_in_pipeline?: number;
-  };
-  job_statistics?: {
-    jobs_by_department?: Dict;
-    job_status_counts?: Dict;
-  };
-  ai_insights?: {
-    summary?: string;
-  };
-  hiring_recommendation_summary?: {
-    summary?: string;
-  };
-  generated_at?: string;
+interface DashboardStats {
+  total_jobs: number;
+  active_jobs: number;
+  open_jobs: number;
+  total_applications: number;
+  applied: number;
+  screening: number;
+  shortlisted: number;
+  interview: number;
+  offered: number;
+  hired: number;
+  rejected: number;
 }
 
-const DASHBOARD_SUMMARY_ENDPOINT = "/dashboard/summary";
+interface DashboardJob {
+  id: string;
+  title: string;
+  location: string | null;
+  department: string | null;
+  status: string;
+  application_count: number;
+  created_at: string;
+}
+
+interface DashboardJobsResponse {
+  jobs: DashboardJob[];
+  jobs_by_department: Record<string, number>;
+}
+
+interface DashboardCandidate {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
+interface DashboardJobRef {
+  id: string;
+  title: string;
+}
+
+interface DashboardApplication {
+  id: string;
+  status: string;
+  applied_at: string;
+  candidate: DashboardCandidate | null;
+  job: DashboardJobRef | null;
+}
+
+interface DashboardPipelineGroup {
+  status: string;
+  count: number;
+  applications: DashboardApplication[];
+}
+
+interface DashboardPipelineResponse {
+  groups: DashboardPipelineGroup[];
+}
+
+interface DashboardRecentApplicationsResponse {
+  applications: DashboardApplication[];
+}
+
+interface DashboardUpcomingInterview {
+  id: string;
+  application_id: string;
+  interview_type: string;
+  scheduled_start: string;
+  scheduled_end: string;
+  timezone: string;
+  status: string;
+  candidate_name?: string | null;
+  job_title?: string | null;
+  interviewer_name?: string | null;
+}
+
+interface DashboardUpcomingInterviewsResponse {
+  interviews: DashboardUpcomingInterview[];
+  interviews_today_count: number;
+}
+
+const ENDPOINTS = {
+  stats: "/dashboard/stats",
+  jobs: "/dashboard/jobs",
+  pipeline: "/dashboard/pipeline",
+  recentApplications: "/dashboard/recent-applications",
+  upcomingInterviews: "/dashboard/upcoming-interviews",
+} as const;
+
+const PIPELINE_STATUS_ORDER = [
+  "applied",
+  "screening",
+  "shortlisted",
+  "interview",
+  "offered",
+  "hired",
+  "rejected",
+] as const;
 
 function numberFormat(value: number | undefined): string {
   return new Intl.NumberFormat().format(value ?? 0);
 }
 
-function toTimelineItems(events: Array<Record<string, unknown>> | undefined): TimelineItem[] {
-  if (!events?.length) {
-    return [];
-  }
-
-  return events.slice(0, 8).map((event, index) => {
-    const action = String(event.action ?? "Activity");
-    const actor = String(event.actor_id ?? "system");
-    const resourceType = String(event.entity_type ?? event.resource_type ?? "entity");
-    const resourceId = String(event.entity_id ?? event.resource_id ?? "");
-    const ts = typeof event.timestamp === "string" ? event.timestamp : undefined;
-
-    return {
-      id: String(event.id ?? `${action}-${index}`),
-      title: action.replaceAll("_", " "),
-      description: `${actor} updated ${resourceType}${resourceId ? ` ${resourceId}` : ""}`,
-      timestamp: ts,
-      meta: resourceType,
-    };
-  });
+function formatStatusLabel(status: string): string {
+  return status.replaceAll("_", " ");
 }
 
-function toTableRows(source: Dict | undefined): Array<{ label: string; value: number }> {
+function formatDate(value: string | undefined): string {
+  if (!value) {
+    return "—";
+  }
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
+function dictRows(source: Record<string, number> | undefined): Array<{ label: string; value: number }> {
   if (!source) {
     return [];
   }
@@ -122,7 +145,12 @@ function toTableRows(source: Dict | undefined): Array<{ label: string; value: nu
 }
 
 export default function RecruiterDashboardPage() {
-  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [jobsPayload, setJobsPayload] = useState<DashboardJobsResponse | null>(null);
+  const [pipeline, setPipeline] = useState<DashboardPipelineResponse | null>(null);
+  const [recentApplications, setRecentApplications] = useState<DashboardApplication[]>([]);
+  const [upcomingInterviews, setUpcomingInterviews] = useState<DashboardUpcomingInterview[]>([]);
+  const [interviewsTodayCount, setInterviewsTodayCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -131,22 +159,47 @@ export default function RecruiterDashboardPage() {
     setError(null);
 
     try {
-      const response = await authFetch(DASHBOARD_SUMMARY_ENDPOINT, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
-      });
+      const [statsRes, jobsRes, pipelineRes, recentRes, upcomingRes] = await Promise.all([
+        authFetch(ENDPOINTS.stats, { method: "GET" }),
+        authFetch(ENDPOINTS.jobs, { method: "GET" }),
+        authFetch(ENDPOINTS.pipeline, { method: "GET" }),
+        authFetch(ENDPOINTS.recentApplications, { method: "GET" }),
+        authFetch(ENDPOINTS.upcomingInterviews, { method: "GET" }),
+      ]);
 
-      if (!response.ok) {
-        throw new Error(`Dashboard request failed (${response.status})`);
+      if (!statsRes.ok || !jobsRes.ok || !pipelineRes.ok || !recentRes.ok || !upcomingRes.ok) {
+        const failed = [
+          !statsRes.ok ? `stats (${statsRes.status})` : null,
+          !jobsRes.ok ? `jobs (${jobsRes.status})` : null,
+          !pipelineRes.ok ? `pipeline (${pipelineRes.status})` : null,
+          !recentRes.ok ? `recent applications (${recentRes.status})` : null,
+          !upcomingRes.ok ? `upcoming interviews (${upcomingRes.status})` : null,
+        ]
+          .filter(Boolean)
+          .join(", ");
+        throw new Error(`Dashboard request failed: ${failed}`);
       }
 
-      const payload = (await response.json()) as DashboardResponse;
-      setDashboard(payload);
+      const statsData = (await statsRes.json()) as DashboardStats;
+      const jobsData = (await jobsRes.json()) as DashboardJobsResponse;
+      const pipelineData = (await pipelineRes.json()) as DashboardPipelineResponse;
+      const recentData = (await recentRes.json()) as DashboardRecentApplicationsResponse;
+      const upcomingData = (await upcomingRes.json()) as DashboardUpcomingInterviewsResponse;
+
+      setStats(statsData);
+      setJobsPayload(jobsData);
+      setPipeline(pipelineData);
+      setRecentApplications(recentData.applications ?? []);
+      setUpcomingInterviews(upcomingData.interviews ?? []);
+      setInterviewsTodayCount(upcomingData.interviews_today_count ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard");
-      setDashboard(null);
+      setStats(null);
+      setJobsPayload(null);
+      setPipeline(null);
+      setRecentApplications([]);
+      setUpcomingInterviews([]);
+      setInterviewsTodayCount(0);
     } finally {
       setLoading(false);
     }
@@ -156,34 +209,57 @@ export default function RecruiterDashboardPage() {
     void loadDashboard();
   }, [loadDashboard]);
 
-  const timelineItems = useMemo(
-    () => toTimelineItems(dashboard?.recent_activity_summary?.items),
-    [dashboard?.recent_activity_summary?.items],
+  const applicationsByStatus = useMemo(() => {
+    if (!stats) {
+      return {};
+    }
+    return {
+      applied: stats.applied,
+      screening: stats.screening,
+      shortlisted: stats.shortlisted,
+      interview: stats.interview,
+      offered: stats.offered,
+      hired: stats.hired,
+      rejected: stats.rejected,
+    };
+  }, [stats]);
+
+  const applicationStatusRows = useMemo(() => {
+    const rows = PIPELINE_STATUS_ORDER.map((status) => ({
+      label: formatStatusLabel(status),
+      value: applicationsByStatus[status] ?? 0,
+    }));
+    return rows.filter((row) => row.value > 0);
+  }, [applicationsByStatus]);
+
+  const jobsByDepartmentRows = useMemo(
+    () => dictRows(jobsPayload?.jobs_by_department),
+    [jobsPayload?.jobs_by_department],
   );
 
-  const hasData = useMemo(() => {
-    if (!dashboard) {
-      return false;
-    }
+  const openJobs = useMemo(
+    () => (jobsPayload?.jobs ?? []).filter((job) => job.status === "open"),
+    [jobsPayload?.jobs],
+  );
 
-    const topCounts = [
-      dashboard.overview?.total_candidates,
-      dashboard.overview?.total_jobs,
-      dashboard.hiring_metrics?.total_candidates,
-      dashboard.notification_summary?.total,
-    ];
+  const pipelineSummaryRows = useMemo(
+    () =>
+      (pipeline?.groups ?? []).map((group) => ({
+        status: formatStatusLabel(group.status),
+        count: group.count,
+      })),
+    [pipeline?.groups],
+  );
 
-    return topCounts.some((value) => (value ?? 0) > 0) || timelineItems.length > 0;
-  }, [dashboard, timelineItems.length]);
+  const applicationStatusMax = useMemo(
+    () => Math.max(1, ...applicationStatusRows.map((row) => row.value)),
+    [applicationStatusRows],
+  );
 
-  const generatedAt = dashboard?.overview?.generated_at ?? dashboard?.generated_at;
-  const recommendationSummary =
-    dashboard?.hiring_recommendation_summary?.summary ?? dashboard?.ai_insights?.summary ?? "";
-
-  const pipelineRows = toTableRows(dashboard?.pipeline?.pipeline_stages);
-  const jobDeptRows = toTableRows(dashboard?.job_statistics?.jobs_by_department ?? dashboard?.job_metrics?.jobs_by_department);
-  const jobStatusRows = toTableRows(dashboard?.job_statistics?.job_status_counts ?? dashboard?.job_metrics?.status_counts);
-  const interviewRows = toTableRows(dashboard?.interview_metrics?.interview_events);
+  const departmentMax = useMemo(
+    () => Math.max(1, ...jobsByDepartmentRows.map((row) => row.value)),
+    [jobsByDepartmentRows],
+  );
 
   return (
     <AppLayout
@@ -192,8 +268,8 @@ export default function RecruiterDashboardPage() {
         <Header
           left={
             <Stack gap="1">
-              <h1 className="recruiter-dashboard-title">Recruiter Dashboard</h1>
-              <p className="recruiter-dashboard-subtitle">Unified recruitment operations and hiring signals</p>
+              <h1 className="recruiter-dashboard-title">Recruiter Workspace</h1>
+              <p className="recruiter-dashboard-subtitle">Company hiring pipeline and job activity</p>
             </Stack>
           }
           right={
@@ -201,89 +277,76 @@ export default function RecruiterDashboardPage() {
               <Button variant="secondary" size="sm" onClick={() => void loadDashboard()}>
                 Refresh
               </Button>
-              <Button variant="primary" size="sm">
-                New Candidate
-              </Button>
             </div>
           }
         />
       }
-      sidebar={
-        <SidebarLayout sticky className="recruiter-dashboard-sidebar">
-          <Section elevated>
-            <Stack gap="3">
-              <strong>Quick Navigation</strong>
-              <nav className="recruiter-dashboard-nav" aria-label="Dashboard navigation">
-                <a href="#kpi-summary">KPI Summary</a>
-                <a href="#pipeline-overview">Pipeline Overview</a>
-                <a href="#hiring-activity">Hiring Activity</a>
-                <a href="#notifications">Notifications</a>
-              </nav>
-            </Stack>
-          </Section>
-          <Section>
-            <Stack gap="2">
-              <strong>Quick Actions</strong>
-              <Button variant="secondary" size="sm">Create Job</Button>
-              <Button variant="secondary" size="sm">Schedule Interview</Button>
-              <Button variant="secondary" size="sm">Review Offers</Button>
-            </Stack>
-          </Section>
-        </SidebarLayout>
-      }
     >
       <ContentContainer className="recruiter-dashboard-main" fluid>
-        {loading ? <LoadingState title="Loading recruiter dashboard" description="Fetching dashboard data and metrics." /> : null}
-        {!loading && error ? <ErrorState title="Unable to load dashboard" description={error} onRetry={() => void loadDashboard()} /> : null}
-        {!loading && !error && !hasData ? (
-          <EmptyState
-            title="No dashboard data available"
-            description="Once candidates, jobs, interviews, and notifications are available they will appear here."
-            actionLabel="Reload"
-            onAction={() => void loadDashboard()}
-          />
+        {loading ? (
+          <LoadingState title="Loading recruiter workspace" description="Fetching dashboard metrics and pipeline data." />
+        ) : null}
+        {!loading && error ? (
+          <ErrorState title="Unable to load dashboard" description={error} onRetry={() => void loadDashboard()} />
         ) : null}
 
-        {!loading && !error && hasData ? (
+        {!loading && !error ? (
           <Stack gap="6">
             <section id="kpi-summary" aria-label="KPI summary section">
-              <Grid columns={{ mobile: 1, md: 2, lg: 4 }} gap="4">
+              <Grid columns={{ mobile: 1, md: 2, lg: 5 }} gap="4">
+                <MetricCard label="Total Jobs" value={numberFormat(stats?.total_jobs)} meta="All company jobs" />
+                <MetricCard label="Active Jobs" value={numberFormat(stats?.active_jobs)} meta="Currently active postings" />
                 <MetricCard
-                  label="Total Candidates"
-                  value={numberFormat(dashboard?.overview?.total_candidates)}
-                  meta="Active candidate pool"
+                  label="Applications"
+                  value={numberFormat(stats?.total_applications)}
+                  meta="Total applications received"
                 />
+                <MetricCard label="Hired" value={numberFormat(stats?.hired)} meta="Candidates hired" />
                 <MetricCard
-                  label="Open Jobs"
-                  value={numberFormat(dashboard?.overview?.total_jobs)}
-                  meta="Total tracked jobs"
-                />
-                <KPICard
-                  label="Hiring Rate"
-                  value={`${dashboard?.hiring_metrics?.hire_rate ?? 0}%`}
-                  progress={dashboard?.hiring_metrics?.hire_rate ?? 0}
-                  statusLabel="Conversion performance"
-                  statusTone="info"
-                />
-                <KPICard
-                  label="Pending Offers"
-                  value={numberFormat(dashboard?.hiring_metrics?.offers_in_progress)}
-                  progress={dashboard?.hiring_metrics?.offers_in_progress ?? 0}
-                  progressMax={Math.max(1, dashboard?.hiring_metrics?.total_candidates ?? 1)}
-                  statusLabel="Offer pipeline"
-                  statusTone="warning"
+                  label="Interviews Today"
+                  value={numberFormat(interviewsTodayCount)}
+                  meta="Scheduled interviews today"
                 />
               </Grid>
             </section>
 
-            <section id="pipeline-overview" aria-label="Pipeline overview section">
+            <section aria-label="Upcoming interviews section">
+              <Section elevated>
+                <Stack gap="3">
+                  <h2 className="recruiter-dashboard-title">Upcoming Interviews</h2>
+                  {upcomingInterviews.length ? (
+                    <Table
+                      columns={[
+                        { key: "candidate", header: "Candidate" },
+                        { key: "job", header: "Job" },
+                        { key: "type", header: "Type" },
+                        { key: "schedule", header: "Schedule" },
+                        { key: "interviewer", header: "Interviewer" },
+                      ]}
+                      data={upcomingInterviews.map((interview) => ({
+                        id: interview.id,
+                        candidate: interview.candidate_name ?? "—",
+                        job: interview.job_title ?? "—",
+                        type: formatStatusLabel(interview.interview_type),
+                        schedule: formatDate(interview.scheduled_start),
+                        interviewer: interview.interviewer_name ?? "—",
+                      }))}
+                      rowKey="id"
+                    />
+                  ) : (
+                    <EmptyState title="No upcoming interviews" description="Scheduled interviews will appear here." />
+                  )}
+                </Stack>
+              </Section>
+            </section>
+
+            <section aria-label="Charts section">
               <Grid columns={{ mobile: 1, lg: 2 }} gap="4">
-                <ChartWrapper title="Candidate Pipeline Overview" description="Current candidates across recruitment stages">
-                  {pipelineRows.length ? (
+                <ChartWrapper title="Applications by Status" description="Application counts across pipeline stages">
+                  {applicationStatusRows.length ? (
                     <div className="recruiter-dashboard-bars">
-                      {pipelineRows.map((row) => {
-                        const total = Math.max(1, dashboard?.pipeline?.total_in_pipeline ?? 1);
-                        const width = (row.value / total) * 100;
+                      {applicationStatusRows.map((row) => {
+                        const width = (row.value / applicationStatusMax) * 100;
                         return (
                           <div key={row.label} className="recruiter-dashboard-bar">
                             <span className="recruiter-dashboard-bar-label">{row.label}</span>
@@ -296,139 +359,112 @@ export default function RecruiterDashboardPage() {
                       })}
                     </div>
                   ) : (
-                    <EmptyState title="No pipeline data" description="Pipeline metrics will appear once stage data is available." />
+                    <EmptyState
+                      title="No application data"
+                      description="Application counts will appear once candidates apply to your jobs."
+                    />
                   )}
                 </ChartWrapper>
 
-                <AnalyticsWidget title="Hiring Recommendation Summary" description="Summary composed from available dashboard recommendation signals">
-                  {recommendationSummary ? (
-                    <Alert tone="info" title="Recommendation" description={recommendationSummary} />
+                <ChartWrapper title="Jobs by Department" description="Open and closed jobs grouped by department">
+                  {jobsByDepartmentRows.length ? (
+                    <div className="recruiter-dashboard-bars">
+                      {jobsByDepartmentRows.map((row) => {
+                        const width = (row.value / departmentMax) * 100;
+                        return (
+                          <div key={row.label} className="recruiter-dashboard-bar">
+                            <span className="recruiter-dashboard-bar-label">{row.label}</span>
+                            <span className="recruiter-dashboard-bar-track">
+                              <span className="recruiter-dashboard-bar-fill" style={{ width: `${width}%` }} />
+                            </span>
+                            <span className="recruiter-dashboard-bar-value">{numberFormat(row.value)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   ) : (
-                    <EmptyState
-                      title="No recommendation summary"
-                      description="Recommendation details are not available in the current dashboard payload."
-                    />
+                    <EmptyState title="No job data" description="Job department breakdown will appear once jobs are created." />
                   )}
-                </AnalyticsWidget>
+                </ChartWrapper>
               </Grid>
             </section>
 
-            <section id="hiring-activity" aria-label="Activity and statistics section">
+            <section aria-label="Tables section">
               <Grid columns={{ mobile: 1, lg: 2 }} gap="4">
-                <AnalyticsWidget title="Recent Hiring Activity" description="Most recent recruiter and system events">
-                  {timelineItems.length ? (
-                    <Timeline items={timelineItems} />
-                  ) : (
-                    <EmptyState title="No recent activity" description="Recent hiring activity will appear here." />
-                  )}
-                </AnalyticsWidget>
+                <Section elevated>
+                  <Stack gap="3">
+                    <h2 className="recruiter-dashboard-title">Recent Applications</h2>
+                    {recentApplications.length ? (
+                      <Table
+                        columns={[
+                          { key: "candidate", header: "Candidate" },
+                          { key: "job", header: "Job" },
+                          { key: "status", header: "Status" },
+                          { key: "applied_at", header: "Applied", align: "right" },
+                        ]}
+                        data={recentApplications.map((application) => ({
+                          id: application.id,
+                          candidate: application.candidate?.full_name ?? "—",
+                          job: application.job?.title ?? "—",
+                          status: formatStatusLabel(application.status),
+                          applied_at: formatDate(application.applied_at),
+                        }))}
+                        rowKey="id"
+                      />
+                    ) : (
+                      <EmptyState title="No recent applications" description="New applications will appear here." />
+                    )}
+                  </Stack>
+                </Section>
 
-                <AnalyticsWidget title="Interview Statistics" description="Interview status and completion signals">
-                  {interviewRows.length ? (
+                <Section elevated>
+                  <Stack gap="3">
+                    <h2 className="recruiter-dashboard-title">Open Jobs</h2>
+                    {openJobs.length ? (
+                      <Table
+                        columns={[
+                          { key: "title", header: "Title" },
+                          { key: "department", header: "Department" },
+                          { key: "location", header: "Location" },
+                          { key: "application_count", header: "Applications", align: "right" },
+                        ]}
+                        data={openJobs.map((job) => ({
+                          id: job.id,
+                          title: job.title,
+                          department: job.department ?? "—",
+                          location: job.location ?? "—",
+                          application_count: numberFormat(job.application_count),
+                        }))}
+                        rowKey="id"
+                      />
+                    ) : (
+                      <EmptyState title="No open jobs" description="Open job postings will appear here." />
+                    )}
+                  </Stack>
+                </Section>
+              </Grid>
+
+              <Section elevated>
+                <Stack gap="3">
+                  <h2 className="recruiter-dashboard-title">Pipeline Summary</h2>
+                  {pipelineSummaryRows.length ? (
                     <Table
                       columns={[
-                        { key: "label", header: "Interview Event" },
-                        { key: "value", header: "Count", align: "right" },
+                        { key: "status", header: "Stage" },
+                        { key: "count", header: "Applications", align: "right" },
                       ]}
-                      data={interviewRows}
-                      rowKey="label"
+                      data={pipelineSummaryRows}
+                      rowKey="status"
                     />
                   ) : (
-                    <EmptyState title="No interview statistics" description="Interview metrics are currently unavailable." />
+                    <EmptyState title="No pipeline data" description="Pipeline stages will appear once applications exist." />
                   )}
-                </AnalyticsWidget>
-              </Grid>
+                </Stack>
+              </Section>
             </section>
-
-            <section aria-label="Job and notifications section">
-              <Grid columns={{ mobile: 1, lg: 2 }} gap="4">
-                <AnalyticsWidget title="Job Statistics" description="Distribution by department and current status">
-                  {jobDeptRows.length || jobStatusRows.length ? (
-                    <Stack gap="4">
-                      {jobDeptRows.length ? (
-                        <Table
-                          caption="Jobs by Department"
-                          columns={[
-                            { key: "label", header: "Department" },
-                            { key: "value", header: "Jobs", align: "right" },
-                          ]}
-                          data={jobDeptRows}
-                          rowKey="label"
-                        />
-                      ) : null}
-                      {jobStatusRows.length ? (
-                        <Table
-                          caption="Jobs by Status"
-                          columns={[
-                            { key: "label", header: "Status" },
-                            { key: "value", header: "Count", align: "right" },
-                          ]}
-                          data={jobStatusRows}
-                          rowKey="label"
-                        />
-                      ) : null}
-                    </Stack>
-                  ) : (
-                    <EmptyState title="No job statistics" description="Job statistics will appear once job data is available." />
-                  )}
-                </AnalyticsWidget>
-
-                <AnalyticsWidget id="notifications" title="Recent Notifications" description="Unread and high-priority notification overview">
-                  {(dashboard?.notification_summary?.total ?? 0) > 0 ? (
-                    <Grid columns={{ mobile: 2, md: 4 }} gap="3">
-                      <Section>
-                        <Stack gap="1">
-                          <small className="recruiter-dashboard-subtitle">Total</small>
-                          <strong>{numberFormat(dashboard?.notification_summary?.total)}</strong>
-                        </Stack>
-                      </Section>
-                      <Section>
-                        <Stack gap="1">
-                          <small className="recruiter-dashboard-subtitle">Unread</small>
-                          <strong>{numberFormat(dashboard?.notification_summary?.unread)}</strong>
-                        </Stack>
-                      </Section>
-                      <Section>
-                        <Stack gap="1">
-                          <small className="recruiter-dashboard-subtitle">Read</small>
-                          <strong>{numberFormat(dashboard?.notification_summary?.read)}</strong>
-                        </Stack>
-                      </Section>
-                      <Section>
-                        <Stack gap="1">
-                          <small className="recruiter-dashboard-subtitle">High Priority</small>
-                          <strong>{numberFormat(dashboard?.notification_summary?.high_priority)}</strong>
-                        </Stack>
-                      </Section>
-                    </Grid>
-                  ) : (
-                    <EmptyState title="No recent notifications" description="Notifications will appear here when available." />
-                  )}
-                </AnalyticsWidget>
-              </Grid>
-            </section>
-
-            <section aria-label="Quick actions section">
-              <AnalyticsWidget
-                title="Quick Actions"
-                description="Recruiter shortcuts for common workflows"
-                action={<Badge tone="brand">Operational</Badge>}
-              >
-                <div className="recruiter-dashboard-actions">
-                  <Button>Start Candidate Review</Button>
-                  <Button variant="secondary">Open Candidate Pipeline</Button>
-                  <Button variant="secondary">Open Interview Queue</Button>
-                  <Button variant="secondary">Open Offer Review</Button>
-                </div>
-              </AnalyticsWidget>
-            </section>
-
-            {generatedAt ? <p className="recruiter-dashboard-generated">Last updated: {generatedAt}</p> : null}
           </Stack>
         ) : null}
       </ContentContainer>
     </AppLayout>
   );
 }
-
-

@@ -1,8 +1,9 @@
+import json
 from functools import lru_cache
 from pathlib import Path
 from typing import List
 
-from pydantic import Field, root_validator
+from pydantic import Field, field_validator, root_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +13,39 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 class Settings(BaseSettings):
     """Application settings loaded from the backend environment file."""
 
+    @field_validator("ALLOWED_HOSTS", "CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_string_lists(cls, value):
+        if value is None:
+            return value
+
+        if isinstance(value, str):
+            stripped_value = value.strip()
+            if not stripped_value:
+                return []
+
+            if stripped_value.startswith("[") and stripped_value.endswith("]"):
+                try:
+                    parsed = json.loads(stripped_value)
+                except json.JSONDecodeError:
+                    normalized = stripped_value.replace("'", '"')
+                    try:
+                        parsed = json.loads(normalized)
+                    except json.JSONDecodeError:
+                        parsed = [item.strip().strip("'\"") for item in stripped_value[1:-1].split(",") if item.strip()]
+                if isinstance(parsed, list):
+                    return [str(item).strip() for item in parsed if str(item).strip()]
+
+            if "," in stripped_value:
+                return [item.strip().strip("'\"") for item in stripped_value.split(",") if item.strip()]
+
+            return [stripped_value.strip().strip("'\"")]
+
+        if isinstance(value, (list, tuple, set)):
+            return [str(item).strip() for item in value if str(item).strip()]
+
+        return value
+
     PROJECT_NAME: str = "AI Recruitment Copilot API"
     API_VERSION: str = "0.1.0"
     SECRET_KEY: str = Field(default="change-me-in-production", env="SECRET_KEY")
@@ -20,7 +54,10 @@ class Settings(BaseSettings):
         env="DATABASE_URL",
     )
     DEBUG: bool = True
-    ALLOWED_HOSTS: List[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1", "testserver"], env="ALLOWED_HOSTS")
+    ALLOWED_HOSTS: List[str] = Field(
+        default_factory=lambda: ["localhost", "127.0.0.1", "testserver", "backend"],
+        env="ALLOWED_HOSTS",
+    )
     CORS_ORIGINS: List[str] = Field(default_factory=lambda: ["http://localhost", "http://127.0.0.1"], env="CORS_ORIGINS")
     RATE_LIMIT_REQUESTS: int = 100
     RATE_LIMIT_WINDOW_SECONDS: int = 60

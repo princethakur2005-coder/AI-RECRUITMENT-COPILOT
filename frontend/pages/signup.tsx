@@ -35,17 +35,24 @@ export default function SignupPage() {
         body: JSON.stringify({ full_name: fullName, email, password }),
       });
 
-      const data = (await res.json()) as { access_token?: string; detail?: string };
+      let data: { access_token?: string; detail?: string; message?: string } | null = null;
+      try {
+        data = (await res.json()) as { access_token?: string; detail?: string; message?: string };
+      } catch {
+        data = null;
+      }
 
       if (!res.ok) {
-        setError(data.detail ?? "Registration failed. Please try again.");
+        const message = data?.detail ?? data?.message ?? "Registration failed. Please try again.";
+        setError(message);
         return;
       }
 
-      localStorage.setItem("access_token", data.access_token ?? "");
+      localStorage.setItem("access_token", data?.access_token ?? "");
       void router.replace("/dashboard");
-    } catch {
-      setError("Network error. Please check your connection.");
+    } catch (error) {
+      const message = error instanceof Error && error.message ? error.message : "Network error. Please check your connection.";
+      setError(message);
     } finally {
       setLoading(false);
     }

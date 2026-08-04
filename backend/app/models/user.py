@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
@@ -12,6 +12,8 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.candidate import Candidate
+    from app.models.company import Company
+    from app.models.company_member import CompanyMember
     from app.models.job import Job
     from app.models.note import Note
     from app.models.offer import Offer
@@ -37,6 +39,12 @@ class User(Base):
     )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(50), nullable=False, default="user")
+    company_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("companies.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -50,6 +58,15 @@ class User(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
+    company: Mapped["Company | None"] = relationship(back_populates="members", foreign_keys=[company_id])
+    company_membership: Mapped["CompanyMember | None"] = relationship(
+        back_populates="user",
+        uselist=False,
+    )
+    owned_companies: Mapped[list["Company"]] = relationship(
+        back_populates="owner",
+        foreign_keys="Company.owner_id",
+    )
     jobs: Mapped[list["Job"]] = relationship(back_populates="created_by")
     candidates: Mapped[list["Candidate"]] = relationship(back_populates="created_by")
     notes: Mapped[list["Note"]] = relationship(back_populates="author", cascade="all, delete-orphan")

@@ -11,7 +11,11 @@ from sqlalchemy.types import Uuid
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.application import Application
+    from app.models.branch import Branch
     from app.models.candidate import Candidate
+    from app.models.company import Company
+    from app.models.company_member import CompanyMember
     from app.models.offer import Offer
     from app.models.user import User
 
@@ -26,6 +30,24 @@ class Job(Base):
         primary_key=True,
         default=uuid4,
         nullable=False,
+    )
+    company_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    branch_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("branches.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    company_member_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("company_members.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     created_by_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True),
@@ -58,6 +80,10 @@ class Job(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
+    company: Mapped["Company"] = relationship(back_populates="jobs")
+    branch: Mapped["Branch | None"] = relationship(back_populates="jobs")
+    company_member: Mapped["CompanyMember"] = relationship(back_populates="jobs")
     created_by: Mapped["User | None"] = relationship(back_populates="jobs")
     candidates: Mapped[list["Candidate"]] = relationship(back_populates="job")
+    applications: Mapped[list["Application"]] = relationship(back_populates="job")
     offers: Mapped[list["Offer"]] = relationship(back_populates="job")

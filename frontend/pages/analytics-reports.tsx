@@ -109,9 +109,9 @@ interface ReportRow {
 
 const ENDPOINTS = {
   summary: "/dashboard/summary",
-  pipeline: "/dashboard/pipeline",
+  pipeline: "/dashboard/pipeline-metrics",
   funnel: "/dashboard/funnel",
-  jobs: "/dashboard/jobs",
+  jobs: "/dashboard/job-metrics",
   interviews: "/dashboard/interviews",
   aiActivities: "/dashboard/ai-activities?page=1&page_size=50&sort_order=desc",
 } as const;

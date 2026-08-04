@@ -2,10 +2,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
+from app.api.application import router as application_router
+from app.api.public_apply import router as public_apply_router
 from app.api.auth import router as auth_router
 from app.api.assistant import router as assistant_router
 from app.api.candidate import router as candidate_router
+from app.api.branch import router as branch_router
+from app.api.company import router as company_router
+from app.api.company_member import router as company_member_router
 from app.api.dashboard import router as dashboard_router
+from app.api.interview import router as interview_router
 from app.api.job import router as job_router
 from app.api.note import router as note_router
 from app.api.offer import router as offer_router
@@ -74,8 +80,14 @@ app.add_middleware(
 
 app.middleware("http")(request_logging_middleware)
 app.include_router(auth_router)
+app.include_router(public_apply_router)
+app.include_router(company_router)
+app.include_router(branch_router)
+app.include_router(company_member_router)
 app.include_router(candidate_router)
 app.include_router(job_router)
+app.include_router(application_router)
+app.include_router(interview_router)
 app.include_router(note_router)
 app.include_router(offer_router)
 app.include_router(assistant_router)

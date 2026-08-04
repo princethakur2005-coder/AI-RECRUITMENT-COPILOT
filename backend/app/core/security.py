@@ -4,14 +4,35 @@ from typing import Any
 
 from fastapi import HTTPException, Request, Response, status
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-
 from app.core.config import settings
+from app.core.exceptions import AppException
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
+    """Hash a password with bcrypt, validating maximum length for the backend.
+
+    Bcrypt has a 72-byte input limit; passlib raises a ValueError if exceeded
+    which bubbles up as a 500. Validate and raise a controlled AppException
+    so the client receives a 4xx error with a helpful message.
+    """
+    if password is None:
+        raise AppException("Password is required", status_code=400, code="password_required")
+
+    try:
+        pw_bytes = password.encode("utf-8")
+    except Exception:
+        raise AppException("Invalid password encoding", status_code=400, code="password_encoding_error")
+
+    if len(pw_bytes) > 72:
+        raise AppException(
+            "Password is too long; it must be at most 72 bytes when UTF-8 encoded. Shorten your password or truncate before sending.",
+            status_code=400,
+            code="password_too_long",
+        )
+
     return pwd_context.hash(password)
 
 

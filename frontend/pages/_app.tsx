@@ -32,11 +32,17 @@ import "../components/analytics/analytics.css";
 // Pages that do not require authentication
 const PUBLIC_PATHS = new Set(["/login", "/signup", "/forgot-password"]);
 
+function isPublicPath(pathname: string): boolean {
+  if (PUBLIC_PATHS.has(pathname)) return true;
+  if (pathname.startsWith("/apply/")) return true;
+  return false;
+}
+
 function AuthGuard({ children, pathname }: { children: ReactNode; pathname: string }) {
   const router = useRouter();
 
   useEffect(() => {
-    const isPublic = PUBLIC_PATHS.has(pathname);
+    const isPublic = isPublicPath(pathname);
     const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
 
     if (!isPublic && !token) {
@@ -48,7 +54,7 @@ function AuthGuard({ children, pathname }: { children: ReactNode; pathname: stri
 }
 
 export default function App({ Component, pageProps, router }: AppProps) {
-  const isPublic = PUBLIC_PATHS.has(router.pathname);
+  const isPublic = isPublicPath(router.pathname);
 
   return (
     <AuthGuard pathname={router.pathname}>

@@ -15,6 +15,7 @@ import {
   Grid,
   Header,
   Input,
+  JobApplicationPipeline,
   LoadingState,
   Pagination,
   Section,
@@ -640,6 +641,10 @@ export default function JobManagementPage() {
                         ))}
                       </div>
                     </Alert>
+
+                    <AnalyticsWidget title="Application Pipeline" description="Track candidates through the hiring pipeline for this job">
+                      <JobApplicationPipeline jobId={String(selectedJob.id)} />
+                    </AnalyticsWidget>
 
                     <AnalyticsWidget title="AI Job Intelligence Summary" description="Summary generated from job intelligence pipeline">
                       {intelligence.summary ? (

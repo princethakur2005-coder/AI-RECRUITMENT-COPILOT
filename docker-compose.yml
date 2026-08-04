@@ -78,6 +78,7 @@ services:
       REQUEST_ID_HEADER_NAME: ${REQUEST_ID_HEADER_NAME:-X-Request-ID}
       METRICS_ENABLED: ${METRICS_ENABLED:-true}
       HEALTHCHECK_ENABLE_DEPENDENCIES: ${HEALTHCHECK_ENABLE_DEPENDENCIES:-true}
+      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-[\"localhost\",\"127.0.0.1\",\"testserver\",\"backend\"]}"
       ENVIRONMENT: ${ENVIRONMENT:-production}
       SECRET_KEY: ${SECRET_KEY:-change-me}
     ports:
@@ -95,6 +96,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        API_BASE_URL: ${API_BASE_URL:-http://backend:8000}
     image: ai-recruitment-frontend:latest
     container_name: ai-recruitment-frontend
     restart: unless-stopped

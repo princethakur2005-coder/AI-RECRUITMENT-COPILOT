@@ -22,6 +22,22 @@ const nextConfig: NextConfig = {
         destination: `${API_BASE_URL}/jobs/:path*`,
       },
       {
+        source: "/public/:path*",
+        destination: `${API_BASE_URL}/public/:path*`,
+      },
+      {
+        source: "/applications/:path*",
+        destination: `${API_BASE_URL}/applications/:path*`,
+      },
+      {
+        source: "/interviews/:path*",
+        destination: `${API_BASE_URL}/interviews/:path*`,
+      },
+      {
+        source: "/companies/:path*",
+        destination: `${API_BASE_URL}/companies/:path*`,
+      },
+      {
         source: "/auth/:path*",
         destination: `${API_BASE_URL}/auth/:path*`,
       },

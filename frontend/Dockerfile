@@ -2,6 +2,8 @@
 
 FROM node:20-alpine AS builder
 
+ARG API_BASE_URL=http://backend:8000
+
 WORKDIR /app
 
 COPY package*.json ./
@@ -9,7 +11,7 @@ RUN npm ci --no-audit --no-fund
 
 COPY . .
 RUN mkdir -p public
-RUN npm run build
+RUN API_BASE_URL=${API_BASE_URL} npm run build
 
 FROM node:20-alpine AS runtime
 

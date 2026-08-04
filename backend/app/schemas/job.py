@@ -41,7 +41,7 @@ class JobBase(BaseModel):
 
 
 class JobCreate(JobBase):
-    pass
+    branch_id: UUID | None = None
 
 
 class JobUpdate(BaseModel):
@@ -57,12 +57,17 @@ class JobUpdate(BaseModel):
     openings: int | None = Field(default=None, ge=1)
     status: str | None = Field(default=None, max_length=50)
     is_active: bool | None = None
+    branch_id: UUID | None = None
 
 
 class JobResponse(JobBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    company_id: UUID
+    branch_id: UUID | None
+    company_member_id: UUID
+    created_by_id: UUID | None
     job_intelligence: JobIntelligence | None = None
     created_at: datetime
     updated_at: datetime

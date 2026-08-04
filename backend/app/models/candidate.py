@@ -11,6 +11,7 @@ from sqlalchemy.types import Uuid
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.application import Application
     from app.models.job import Job
     from app.models.note import Note
     from app.models.offer import Offer
@@ -89,6 +90,7 @@ class Candidate(Base):
 
     created_by: Mapped["User | None"] = relationship(back_populates="candidates")
     job: Mapped["Job | None"] = relationship(back_populates="candidates")
+    applications: Mapped[list["Application"]] = relationship(back_populates="candidate")
     notes: Mapped[list["Note"]] = relationship(back_populates="candidate", cascade="all, delete-orphan")
     offers: Mapped[list["Offer"]] = relationship(back_populates="candidate", cascade="all, delete-orphan")
 

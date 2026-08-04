@@ -23,6 +23,10 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, List[str]] = {
         "notification:send",
         "audit:read",
     ],
+    "company_admin": [
+        "company:read",
+        "company:manage",
+    ],
     "recruiter": [
         "candidate:read",
         "candidate:write",
