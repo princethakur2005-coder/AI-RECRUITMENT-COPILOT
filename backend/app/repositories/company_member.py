@@ -39,6 +39,30 @@ class CompanyMemberRepository(BaseRepository[CompanyMember]):
         )
         return list(self.db.scalars(statement).unique().all())
 
+    def list_active_by_company_and_roles(
+        self,
+        company_id: UUID,
+        roles: frozenset[str] | set[str] | list[str],
+    ) -> list[CompanyMember]:
+        role_values = list(roles)
+        if not role_values:
+            return []
+        statement = (
+            select(CompanyMember)
+            .options(joinedload(CompanyMember.user))
+            .where(
+                CompanyMember.company_id == company_id,
+                CompanyMember.is_active.is_(True),
+                CompanyMember.role.in_(role_values),
+            )
+            .order_by(CompanyMember.created_at.asc())
+        )
+        return list(self.db.scalars(statement).unique().all())
+
+    def list_company_ids_for_user(self, user_id: UUID) -> list[UUID]:
+        statement = select(CompanyMember.company_id).where(CompanyMember.user_id == user_id)
+        return list(self.db.scalars(statement).all())
+
     def get_by_id_for_company(self, member_id: UUID, company_id: UUID) -> CompanyMember | None:
         statement = (
             select(CompanyMember)

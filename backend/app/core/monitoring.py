@@ -10,7 +10,10 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.db.database import engine
-from app.services.cache import cache_service
+
+READINESS_HEALTHY = "healthy"
+READINESS_UNHEALTHY = "unhealthy"
+READINESS_DEGRADED = "degraded"
 
 
 class MetricsRegistry:
@@ -74,7 +77,6 @@ class MetricsRegistry:
 
         self.set_gauge("resource_memory_placeholder_mb", rss_mb)
         self.set_gauge("resource_cpu_placeholder", 0.0)
-        # Background worker placeholders
         self.set_gauge("background_worker_threads", float(settings.BACKGROUND_WORKER_THREADS))
 
     def snapshot(self) -> dict[str, Any]:
@@ -90,41 +92,76 @@ class MetricsRegistry:
 metrics_registry = MetricsRegistry()
 
 
+def _sanitize_dependency_error(exc: Exception) -> str:
+    """Return a safe dependency error message without credentials or SQL details."""
+    message = str(exc).strip()
+    if not message:
+        return "dependency check failed"
+    lowered = message.lower()
+    sensitive_markers = (
+        "password",
+        "postgresql",
+        "postgres",
+        "psycopg",
+        "sqlite",
+        "connection refused",
+        "authentication failed",
+        "could not connect",
+        "operationalerror",
+        "select 1",
+    )
+    if any(marker in lowered for marker in sensitive_markers):
+        return "dependency check failed"
+    if len(message) > 120:
+        return "dependency check failed"
+    return message
+
+
 def _check_database_health() -> dict[str, Any]:
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        return {"status": "healthy"}
+        return {"status": READINESS_HEALTHY}
     except Exception as exc:
-        return {"status": "unhealthy", "error": str(exc)}
+        return {
+            "status": READINESS_UNHEALTHY,
+            "error": _sanitize_dependency_error(exc),
+        }
 
 
-def _check_redis_health() -> dict[str, Any]:
+def _check_optional_redis_health() -> dict[str, Any]:
     if not settings.HEALTHCHECK_ENABLE_DEPENDENCIES:
         return {"status": "skipped"}
 
     try:
+        from app.services.cache import cache_service
+
         health = cache_service.healthcheck()
         if health.get("backend_ok"):
-            return {"status": "healthy", "backend": "redis"}
+            return {"status": READINESS_HEALTHY, "backend": "redis"}
         if health.get("fallback_ok"):
-            return {"status": "degraded", "backend": "fallback"}
-        return {"status": "unhealthy", "backend": "redis"}
+            return {"status": READINESS_DEGRADED, "backend": "fallback"}
+        return {"status": READINESS_UNHEALTHY, "backend": "redis"}
     except Exception as exc:
-        return {"status": "unhealthy", "error": str(exc)}
+        return {
+            "status": READINESS_UNHEALTHY,
+            "error": _sanitize_dependency_error(exc),
+        }
 
 
 def dependency_health_report() -> dict[str, Any]:
     db = _check_database_health()
-    redis = _check_redis_health()
+    redis = _check_optional_redis_health()
 
     statuses = [db.get("status"), redis.get("status")]
-    if any(status == "unhealthy" for status in statuses):
-        overall = "unhealthy"
-    elif any(status == "degraded" for status in statuses):
-        overall = "degraded"
+    if db.get("status") == READINESS_UNHEALTHY:
+        overall = READINESS_UNHEALTHY
+    elif any(status == READINESS_UNHEALTHY for status in statuses):
+        overall = READINESS_UNHEALTHY
+    elif any(status == READINESS_DEGRADED for status in statuses):
+        overall = READINESS_DEGRADED
     else:
-        overall = "healthy"
+        overall = READINESS_HEALTHY
 
     return {
         "status": overall,
@@ -136,18 +173,29 @@ def dependency_health_report() -> dict[str, Any]:
 
 
 def readiness_report(service_name: str) -> dict[str, Any]:
-    metrics_registry.update_resource_placeholders()
-    deps = dependency_health_report() if settings.HEALTHCHECK_ENABLE_DEPENDENCIES else {"status": "healthy", "dependencies": {}}
-
-    return {
-        "status": deps.get("status", "healthy"),
+    deps = dependency_health_report()
+    status = deps.get("status", READINESS_HEALTHY)
+    payload: dict[str, Any] = {
+        "status": status,
         "service": service_name,
         "dependencies": deps.get("dependencies", {}),
-        "monitoring": {
-            "enabled": settings.METRICS_ENABLED,
-            "metrics": metrics_registry.snapshot(),
-        },
     }
+    if settings.METRICS_ENABLED:
+        metrics_registry.update_resource_placeholders()
+        payload["monitoring"] = {
+            "enabled": True,
+            "metrics": metrics_registry.snapshot(),
+        }
+    return payload
+
+
+def readiness_http_status(report: dict[str, Any]) -> int:
+    status = str(report.get("status", READINESS_UNHEALTHY))
+    if status == READINESS_HEALTHY:
+        return 200
+    if status == READINESS_DEGRADED:
+        return 200
+    return 503
 
 
 def liveness_report(service_name: str) -> dict[str, Any]:

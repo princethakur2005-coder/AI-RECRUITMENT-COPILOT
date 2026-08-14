@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
@@ -16,12 +16,16 @@ if TYPE_CHECKING:
     from app.models.application import Application
     from app.models.company import Company
     from app.models.company_member import CompanyMember
+    from app.models.interview_ai_analysis import InterviewAIAnalysis
 
 
 class Interview(Base):
     """Scheduled interview for a job application."""
 
     __tablename__ = "interviews"
+    __table_args__ = (
+        Index("ix_interviews_company_id_scheduled_start", "company_id", "scheduled_start"),
+    )
 
     id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
@@ -80,3 +84,7 @@ class Interview(Base):
     application: Mapped["Application"] = relationship(back_populates="interviews")
     company: Mapped["Company"] = relationship(back_populates="interviews")
     interviewer_member: Mapped["CompanyMember"] = relationship(back_populates="interviews")
+    ai_analysis: Mapped["InterviewAIAnalysis | None"] = relationship(
+        back_populates="interview",
+        uselist=False,
+    )

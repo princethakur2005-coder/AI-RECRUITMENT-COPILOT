@@ -1,3 +1,12 @@
+"""Legacy in-memory job metadata — superseded by PostgreSQL DurableJobService.
+
+Production background processing uses ``app.services.durable_job_service.DurableJobService``
+with ``app.services.durable_job_worker.DurableJobWorker``.
+
+This module remains for backward-compatible metadata APIs only; do not use for
+email delivery or other externally visible side effects.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -17,11 +26,7 @@ from app.schemas.background_job import (
 
 
 class BackgroundJobService:
-    """Generic in-process background job orchestration metadata service.
-
-    This service stores scheduling and execution metadata only, and is designed
-    for future runtime integrations without coupling to a specific processor.
-    """
+    """In-process metadata scheduler (non-durable). Use DurableJobService in production."""
 
     def __init__(self, now_provider: Callable[[], datetime] | None = None) -> None:
         self._items: dict[UUID, BackgroundJobResponse] = {}

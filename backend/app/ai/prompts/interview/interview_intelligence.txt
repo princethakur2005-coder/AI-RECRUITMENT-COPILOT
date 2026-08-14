@@ -1,0 +1,40 @@
+Analyze the interview evidence for a candidate against the job requirements and return structured interview intelligence.
+
+Job title: {{job_title}}
+Department: {{department}}
+Experience level: {{experience_level}}
+Employment type: {{employment_type}}
+
+Job description:
+{{job_description}}
+
+Candidate: {{candidate_name}}
+Interview type: {{interview_type}}
+Interview status: {{interview_status}}
+Interviewer notes and feedback:
+{{interviewer_notes}}
+
+Resume intelligence summary (if available):
+{{resume_intelligence_summary}}
+
+Resume matched skills (if available):
+{{matched_skills}}
+
+Resume gaps identified (if available):
+{{resume_gaps_identified}}
+
+Return JSON only with these fields:
+- overall_score (integer 0-100)
+- technical_score (integer 0-100)
+- communication_score (integer 0-100)
+- problem_solving_score (integer 0-100)
+- behavioral_score (integer 0-100)
+- strengths (array of strings)
+- weaknesses (array of strings)
+- gaps_identified (array of strings)
+- demonstrated_competencies (array of strings)
+- summary (string, 2-4 sentences)
+- recommendation (string, concise next-step recommendation for this interview round)
+- confidence (float between 0 and 1)
+
+Score each dimension independently. Base conclusions only on the provided interview evidence, job requirements, and optional resume context. If interviewer notes are sparse, lower confidence accordingly.

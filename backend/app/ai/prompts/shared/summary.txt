@@ -1,0 +1,6 @@
+Summarize the following recruitment context for a recruiter dashboard.
+
+Context:
+{{context}}
+
+Provide a concise plain-text summary in 2-3 sentences.

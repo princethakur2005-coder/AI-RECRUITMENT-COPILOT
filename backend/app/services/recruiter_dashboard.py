@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
+from typing import TypeVar
 from uuid import UUID
 
+from pydantic import BaseModel
+
 from app.core.application_status import PIPELINE_STATUSES
+from app.core.config import settings
+from app.core.read_cache import CacheBackend, get_read_cache
 from app.models.application import Application
 from app.models.user import User
 from app.repositories.application import ApplicationRepository
@@ -24,8 +30,11 @@ from app.schemas.recruiter_dashboard import (
     DashboardUpcomingInterview,
     DashboardUpcomingInterviewsResponse,
 )
+from app.services.dashboard_cache import dashboard_cache_key
 
 DASHBOARD_ALLOWED_ROLES = frozenset({"company_admin", "recruiter", "hiring_manager"})
+
+TModel = TypeVar("TModel", bound=BaseModel)
 
 
 class RecruiterDashboardService:
@@ -37,11 +46,41 @@ class RecruiterDashboardService:
         application_repository: ApplicationRepository,
         member_repository: CompanyMemberRepository,
         interview_repository: InterviewRepository | None = None,
+        cache: CacheBackend | None = None,
+        cache_ttl_seconds: int | None = None,
     ) -> None:
         self.job_repository = job_repository
         self.application_repository = application_repository
         self.member_repository = member_repository
         self.interview_repository = interview_repository
+        self._cache = cache
+        self._cache_ttl_seconds = cache_ttl_seconds
+
+    def _cache_backend(self) -> CacheBackend:
+        return self._cache if self._cache is not None else get_read_cache()
+
+    def _cache_ttl(self) -> int:
+        if self._cache_ttl_seconds is not None:
+            return self._cache_ttl_seconds
+        return int(getattr(settings, "DASHBOARD_CACHE_TTL_SECONDS", 30))
+
+    def _cached_response(
+        self,
+        company_id: UUID,
+        view: str,
+        model_cls: type[TModel],
+        loader: Callable[[], TModel],
+    ) -> TModel:
+        if not getattr(settings, "READ_CACHE_ENABLED", True):
+            return loader()
+        key = dashboard_cache_key(company_id, view)
+        cache = self._cache_backend()
+        cached = cache.get(key)
+        if cached is not None:
+            return model_cls.model_validate(cached)
+        result = loader()
+        cache.set(key, result.model_dump(mode="json"), ttl=self._cache_ttl())
+        return result
 
     def _resolve_active_membership(self, user: User):
         membership = self.member_repository.get_by_user_id(user.id)
@@ -75,14 +114,10 @@ class RecruiterDashboardService:
             job=job_ref,
         )
 
-    def get_stats(self, user: User) -> DashboardStatsResponse:
-        membership = self._resolve_active_membership(user)
-        company_id = membership.company_id
-
+    def _load_stats(self, company_id: UUID) -> DashboardStatsResponse:
         job_counts = self.job_repository.get_job_counts(company_id)
         status_counts = self.application_repository.count_by_status(company_id)
         total_applications = self.application_repository.count_total(company_id)
-
         return DashboardStatsResponse(
             total_jobs=job_counts["total"],
             active_jobs=job_counts["active"],
@@ -95,6 +130,16 @@ class RecruiterDashboardService:
             offered=self._status_value(status_counts, "offered"),
             hired=self._status_value(status_counts, "hired"),
             rejected=self._status_value(status_counts, "rejected"),
+        )
+
+    def get_stats(self, user: User) -> DashboardStatsResponse:
+        membership = self._resolve_active_membership(user)
+        company_id = membership.company_id
+        return self._cached_response(
+            company_id,
+            "stats",
+            DashboardStatsResponse,
+            lambda: self._load_stats(company_id),
         )
 
     def get_jobs(self, user: User) -> DashboardJobListResponse:
@@ -154,16 +199,18 @@ class RecruiterDashboardService:
         membership = self._resolve_active_membership(user)
         company_id = membership.company_id
 
-        stats = self.get_stats(user)
-        jobs_by_department = self.job_repository.count_by_department(company_id)
-        status_counts = self.application_repository.count_by_status(company_id)
+        def _load() -> DashboardOverviewResponse:
+            stats = self._load_stats(company_id)
+            jobs_by_department = self.job_repository.count_by_department(company_id)
+            status_counts = self.application_repository.count_by_status(company_id)
+            return DashboardOverviewResponse(
+                stats=stats,
+                jobs_by_department=jobs_by_department,
+                applications_by_status={status: int(count) for status, count in status_counts.items()},
+                generated_at=datetime.now(timezone.utc),
+            )
 
-        return DashboardOverviewResponse(
-            stats=stats,
-            jobs_by_department=jobs_by_department,
-            applications_by_status={status: int(count) for status, count in status_counts.items()},
-            generated_at=datetime.now(timezone.utc),
-        )
+        return self._cached_response(company_id, "overview", DashboardOverviewResponse, _load)
 
     def get_upcoming_interviews(self, user: User, limit: int = 10) -> DashboardUpcomingInterviewsResponse:
         membership = self._resolve_active_membership(user)

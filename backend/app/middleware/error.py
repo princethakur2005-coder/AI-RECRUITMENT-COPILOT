@@ -8,6 +8,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from app.core.config import settings
+from app.core.logging import request_id_context, set_request_id
 
 logger = logging.getLogger("app.middleware.error")
 
@@ -19,6 +20,7 @@ class RequestCorrelationMiddleware(BaseHTTPMiddleware):
         header_name = settings.REQUEST_ID_HEADER_NAME
         request_id = request.headers.get(header_name) or str(uuid.uuid4())
         request.state.request_id = request_id
+        set_request_id(request_id)
         response = await call_next(request)
         if header_name not in response.headers:
             response.headers[header_name] = request_id

@@ -1,3 +1,6 @@
+from datetime import datetime
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -5,9 +8,14 @@ from app.db.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.repositories.application import ApplicationRepository
+from app.repositories.application_hiring_decision import ApplicationHiringDecisionRepository
+from app.repositories.branch import BranchRepository
 from app.repositories.company_member import CompanyMemberRepository
 from app.repositories.interview import InterviewRepository
 from app.repositories.job import JobRepository
+from app.repositories.offer import OfferRepository
+from app.repositories.reporting import ReportingRepository
+from app.schemas.candidate_ranking import TopCandidatesResponse
 from app.schemas.recruiter_dashboard import (
     DashboardJobListResponse,
     DashboardOverviewResponse,
@@ -16,8 +24,17 @@ from app.schemas.recruiter_dashboard import (
     DashboardStatsResponse,
     DashboardUpcomingInterviewsResponse,
 )
+from app.schemas.recruiter_workspace import RecruiterWorkspaceResponse
+from app.schemas.reporting import (
+    ReportingOverviewResponse,
+    ReportingPipelineResponse,
+    ReportingTimeSeriesResponse,
+)
 from app.services.dashboard_service import DashboardService
-from app.services.recruiter_dashboard import RecruiterDashboardService
+from app.services.recruiter_dashboard import DASHBOARD_ALLOWED_ROLES, RecruiterDashboardService
+from app.services.candidate_ranking import CandidateRankingService
+from app.services.recruiter_workspace import RecruiterWorkspaceService
+from app.services.reporting import ReportingService
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -32,6 +49,33 @@ def get_recruiter_dashboard_service(db: Session = Depends(get_db)) -> RecruiterD
         ApplicationRepository(db),
         CompanyMemberRepository(db),
         InterviewRepository(db),
+    )
+
+
+def get_candidate_ranking_service(db: Session = Depends(get_db)) -> CandidateRankingService:
+    return CandidateRankingService(
+        ApplicationRepository(db),
+        JobRepository(db),
+        CompanyMemberRepository(db),
+    )
+
+
+def get_recruiter_workspace_service(db: Session = Depends(get_db)) -> RecruiterWorkspaceService:
+    return RecruiterWorkspaceService(
+        db=db,
+        application_repository=ApplicationRepository(db),
+        hiring_decision_repository=ApplicationHiringDecisionRepository(db),
+        offer_repository=OfferRepository(db),
+        member_repository=CompanyMemberRepository(db),
+    )
+
+
+def get_reporting_service(db: Session = Depends(get_db)) -> ReportingService:
+    return ReportingService(
+        ReportingRepository(db),
+        CompanyMemberRepository(db),
+        JobRepository(db),
+        BranchRepository(db),
     )
 
 
@@ -52,6 +96,25 @@ def _handle_service_errors(exc: Exception) -> None:
             detail=str(exc),
         ) from exc
     raise exc
+
+
+def get_dashboard_member_user(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    """Staff dashboard routes require active company membership and dashboard RBAC."""
+    membership = CompanyMemberRepository(db).get_by_user_id(user.id)
+    if membership is None or not membership.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Active company membership required",
+        )
+    if membership.role not in DASHBOARD_ALLOWED_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions for recruiter dashboard",
+        )
+    return user
 
 
 @router.get("", response_model=DashboardOverviewResponse)
@@ -126,33 +189,148 @@ def recruiter_dashboard_upcoming_interviews(
         raise
 
 
+@router.get("/top-candidates", response_model=TopCandidatesResponse)
+def recruiter_dashboard_top_candidates(
+    limit: int = Query(5, ge=1, le=20),
+    user: User = Depends(get_current_user),
+    service: CandidateRankingService = Depends(get_candidate_ranking_service),
+) -> TopCandidatesResponse:
+    try:
+        return service.get_top_candidates(user, limit=limit)
+    except Exception as exc:  # noqa: BLE001
+        _handle_service_errors(exc)
+        raise
+
+
+@router.get("/workspace", response_model=RecruiterWorkspaceResponse)
+def recruiter_workspace(
+    user: User = Depends(get_current_user),
+    service: RecruiterWorkspaceService = Depends(get_recruiter_workspace_service),
+) -> RecruiterWorkspaceResponse:
+    try:
+        return service.get_workspace_for_user(user)
+    except Exception as exc:  # noqa: BLE001
+        _handle_service_errors(exc)
+        raise
+
+
+@router.get("/analytics/overview", response_model=ReportingOverviewResponse)
+def reporting_overview(
+    branch_id: UUID | None = Query(None),
+    job_id: UUID | None = Query(None),
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+    user: User = Depends(get_current_user),
+    service: ReportingService = Depends(get_reporting_service),
+) -> ReportingOverviewResponse:
+    try:
+        return service.get_overview(
+            user,
+            branch_id=branch_id,
+            job_id=job_id,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _handle_service_errors(exc)
+        raise
+
+
+@router.get("/analytics/pipeline", response_model=ReportingPipelineResponse)
+def reporting_pipeline(
+    branch_id: UUID | None = Query(None),
+    job_id: UUID | None = Query(None),
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+    user: User = Depends(get_current_user),
+    service: ReportingService = Depends(get_reporting_service),
+) -> ReportingPipelineResponse:
+    try:
+        return service.get_pipeline(
+            user,
+            branch_id=branch_id,
+            job_id=job_id,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _handle_service_errors(exc)
+        raise
+
+
+@router.get("/analytics/time-series", response_model=ReportingTimeSeriesResponse)
+def reporting_time_series(
+    branch_id: UUID | None = Query(None),
+    job_id: UUID | None = Query(None),
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+    user: User = Depends(get_current_user),
+    service: ReportingService = Depends(get_reporting_service),
+) -> ReportingTimeSeriesResponse:
+    try:
+        return service.get_time_series(
+            user,
+            branch_id=branch_id,
+            job_id=job_id,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _handle_service_errors(exc)
+        raise
+
+
 @router.get("/summary")
-def dashboard_summary(service: DashboardService = Depends(get_dashboard_service)) -> dict:
+def dashboard_summary(
+    user: User = Depends(get_dashboard_member_user),
+    service: DashboardService = Depends(get_dashboard_service),
+) -> dict:
+    _ = user
     return service.get_dashboard()
 
 
 @router.get("/pipeline-metrics")
-def pipeline_metrics(service: DashboardService = Depends(get_dashboard_service)) -> dict:
+def pipeline_metrics(
+    user: User = Depends(get_dashboard_member_user),
+    service: DashboardService = Depends(get_dashboard_service),
+) -> dict:
+    _ = user
     return service.get_pipeline_widget()
 
 
 @router.get("/funnel")
-def funnel_metrics(service: DashboardService = Depends(get_dashboard_service)) -> dict:
+def funnel_metrics(
+    user: User = Depends(get_dashboard_member_user),
+    service: DashboardService = Depends(get_dashboard_service),
+) -> dict:
+    _ = user
     return service.get_funnel_widget()
 
 
 @router.get("/job-metrics")
-def job_statistics(service: DashboardService = Depends(get_dashboard_service)) -> dict:
+def job_statistics(
+    user: User = Depends(get_dashboard_member_user),
+    service: DashboardService = Depends(get_dashboard_service),
+) -> dict:
+    _ = user
     return service.get_job_statistics_widget()
 
 
 @router.get("/interviews")
-def interview_metrics(service: DashboardService = Depends(get_dashboard_service)) -> dict:
+def interview_metrics(
+    user: User = Depends(get_dashboard_member_user),
+    service: DashboardService = Depends(get_dashboard_service),
+) -> dict:
+    _ = user
     return service.get_interview_metrics_widget()
 
 
 @router.get("/activities")
-def recent_activity(service: DashboardService = Depends(get_dashboard_service)) -> dict:
+def recent_activity(
+    user: User = Depends(get_dashboard_member_user),
+    service: DashboardService = Depends(get_dashboard_service),
+) -> dict:
+    _ = user
     return service.get_activity_widget()
 
 
@@ -166,8 +344,10 @@ def ai_activities(
     sort_order: str = Query("desc", pattern="^(asc|desc)$", description="Sort direction"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Page size"),
+    user: User = Depends(get_dashboard_member_user),
     service: DashboardService = Depends(get_dashboard_service),
 ) -> dict:
+    _ = user
     return service.get_ai_activity_events(
         activity_type=activity_type,
         resource_type=resource_type,

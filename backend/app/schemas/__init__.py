@@ -1,4 +1,18 @@
-from app.schemas.auth import LoginRequest, TokenRefreshRequest, TokenResponse
+from app.schemas.auth import (
+    CandidateLoginRequest,
+    CandidateMeResponse,
+    CandidateRegisterRequest,
+    LoginRequest,
+    TokenRefreshRequest,
+    TokenResponse,
+)
+from app.schemas.calendar import (
+    CalendarEventRequest,
+    CalendarEventResult,
+    CalendarIntegrationCreate,
+    CalendarIntegrationResponse,
+    InterviewCalendarSyncResponse,
+)
 from app.schemas.candidate import (
     CandidateCreate,
     CandidateResponse,
@@ -9,11 +23,23 @@ from app.schemas.candidate import (
 )
 from app.schemas.job import JobCreate, JobResponse, JobUpdate
 from app.schemas.offer import (
+    ApplicationOfferHistoryResponse,
     CompensationSummary,
+    JobOfferItemResponse,
+    JobOfferListResponse,
     OfferCreate,
+    OfferCreateForApplication,
     OfferHiringIntelligence,
+    OfferPagination,
     OfferResponse,
     OfferUpdate,
+)
+from app.schemas.hiring_decision import (
+    ApplicationHiringDecisionResponse,
+    HiringDecisionOverrideRequest,
+    JobHiringDecisionItemResponse,
+    JobHiringDecisionListResponse,
+    RecruiterOverrideInfo,
 )
 from app.schemas.recommendation import (
     AIHiringSummary,
@@ -46,12 +72,22 @@ from app.schemas.workspace import (
 )
 
 __all__ = [
+    "CalendarEventRequest",
+    "CalendarEventResult",
+    "CalendarIntegrationCreate",
+    "CalendarIntegrationResponse",
+    "InterviewCalendarSyncResponse",
     "CandidateCreate",
     "CandidateResponse",
     "CandidateTimelineEvent",
     "CandidateTimelineResponse",
     "CandidateUpdate",
     "RecruiterNote",
+    "ApplicationHiringDecisionResponse",
+    "HiringDecisionOverrideRequest",
+    "JobHiringDecisionItemResponse",
+    "JobHiringDecisionListResponse",
+    "RecruiterOverrideInfo",
     "AIHiringSummary",
     "DecisionConfidence",
     "ExplainableDecision",
@@ -63,11 +99,19 @@ __all__ = [
     "JobResponse",
     "JobUpdate",
     "OfferCreate",
+    "OfferCreateForApplication",
     "OfferResponse",
     "OfferUpdate",
     "CompensationSummary",
     "OfferHiringIntelligence",
+    "ApplicationOfferHistoryResponse",
+    "JobOfferItemResponse",
+    "JobOfferListResponse",
+    "OfferPagination",
     "LoginRequest",
+    "CandidateLoginRequest",
+    "CandidateMeResponse",
+    "CandidateRegisterRequest",
     "TokenRefreshRequest",
     "TokenResponse",
     "UserCreate",

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.candidate import Candidate
@@ -14,8 +14,12 @@ class CandidateRepository(BaseRepository[Candidate]):
         super().__init__(db, Candidate)
 
     def get_by_email(self, email: str) -> Candidate | None:
-        statement = select(Candidate).where(Candidate.email == email)
+        normalized = email.strip().lower()
+        statement = select(Candidate).where(func.lower(Candidate.email) == normalized)
         return self.db.scalar(statement)
+
+    def set_password(self, candidate: Candidate, hashed_password: str) -> Candidate:
+        return self.update(candidate, {"hashed_password": hashed_password})
 
     def search_by_skill(self, skill: str) -> list[Candidate]:
         statement = select(Candidate).where(Candidate.skills.ilike(f"%{skill}%"))

@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 
-from app.services.chat_service import ChatService
+from app.ai.exceptions import AIError
+from app.ai.pipelines.hiring_decision_narrative import HiringDecisionNarrativePipeline
 
 
 class Recommendation(str, Enum):
@@ -131,6 +132,26 @@ class ResumeIntelligenceScorer(BaseSignalScorer):
     signal_name = "resume_intelligence"
 
     def score(self, payload: Dict[str, Any]) -> Tuple[float, float, Dict[str, Any]]:
+        if payload.get("source") == "application_ai_analysis" or payload.get("overall_score") is not None:
+            overall_raw = float(payload.get("overall_score") or 0.0)
+            overall_score = overall_raw / 100.0 if overall_raw > 1.0 else overall_raw
+
+            confidence_raw = float(payload.get("confidence") or 0.0)
+            confidence = confidence_raw / 100.0 if confidence_raw > 1.0 else confidence_raw
+
+            score = self._clamp(overall_score)
+            confidence = self._clamp(0.4 + 0.6 * confidence)
+            return score, confidence, {
+                "source": str(payload.get("source") or "application_ai_analysis"),
+                "overall_score": round(overall_score, 3),
+                "skills_score": round(float(payload.get("skills_score") or 0.0) / 100.0, 3)
+                if float(payload.get("skills_score") or 0.0) > 1.0
+                else round(float(payload.get("skills_score") or 0.0), 3),
+                "experience_score": round(float(payload.get("experience_score") or 0.0) / 100.0, 3)
+                if float(payload.get("experience_score") or 0.0) > 1.0
+                else round(float(payload.get("experience_score") or 0.0), 3),
+            }
+
         ats = payload.get("ats_compatibility_score") or payload.get("ats_compatibility") or {}
         ats_score_raw = ats.get("score", 0)
         if isinstance(ats_score_raw, (int, float)):
@@ -278,9 +299,13 @@ class EvaluationReportExplainer:
     Generates deterministic explanation and optionally enriches with AI narrative.
     """
 
-    def __init__(self, provider: Any | None = None) -> None:
-        provider_name = getattr(provider, "provider_name", "gemini") if provider else "gemini"
-        self.chat = ChatService(provider=provider, provider_name=provider_name)
+    def __init__(
+        self,
+        pipeline: HiringDecisionNarrativePipeline | None = None,
+        provider: Any | None = None,
+    ) -> None:
+        _ = provider
+        self.pipeline = pipeline or HiringDecisionNarrativePipeline()
 
     def build(
         self,
@@ -314,33 +339,32 @@ class EvaluationReportExplainer:
             deterministic["ai_narrative"] = ""
             return deterministic
 
-        prompt = (
-            "Generate a concise explainable hiring summary in enterprise tone. "
-            "Use the provided signals and avoid unsupported claims. "
-            "Return JSON with keys: narrative, key_reasons (array), risk_flags (array).\n"
-            f"Candidate: {candidate_id}\n"
-            f"Recommendation: {recommendation.value}\n"
-            f"Overall score: {overall_score}\n"
-            f"Signals: {json.dumps(deterministic['score_rationale'])}"
-        )
-        ai_resp = self.chat.send_message(prompt)
-        content = ai_resp.get("content", "") or ""
+        variables = {
+            "candidate_id": candidate_id,
+            "recommendation": recommendation.value,
+            "overall_score": str(round(overall_score, 4)),
+            "signals_json": json.dumps(deterministic["score_rationale"]),
+        }
 
         try:
-            parsed = json.loads(content)
-            if isinstance(parsed, dict):
+            pipeline_result = self.pipeline.generate_narrative(variables)
+            if pipeline_result.status == "ok" and isinstance(pipeline_result.data, dict):
+                parsed = pipeline_result.data
                 deterministic["ai_narrative"] = parsed.get("narrative") or ""
                 deterministic["key_reasons"] = parsed.get("key_reasons") or []
                 deterministic["risk_flags"] = parsed.get("risk_flags") or []
-                deterministic["raw_ai"] = ai_resp
+                deterministic["raw_ai"] = {
+                    "provider": pipeline_result.provider,
+                    "model": pipeline_result.model,
+                    "latency_ms": pipeline_result.latency_ms,
+                }
                 return deterministic
-        except Exception:
+        except AIError:
             pass
 
-        deterministic["ai_narrative"] = content.strip()
+        deterministic["ai_narrative"] = ""
         deterministic["key_reasons"] = []
         deterministic["risk_flags"] = []
-        deterministic["raw_ai"] = ai_resp
         return deterministic
 
 

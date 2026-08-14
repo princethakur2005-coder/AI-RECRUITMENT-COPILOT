@@ -1,16 +1,22 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.repositories.application import ApplicationRepository
+from app.repositories.application_ai_analysis import ApplicationAIAnalysisRepository
 from app.repositories.company_member import CompanyMemberRepository
 from app.repositories.interview import InterviewRepository
+from app.repositories.interview_ai_analysis import InterviewAIAnalysisRepository
+from app.repositories.notification import NotificationRepository
 from app.schemas.interview import InterviewCreate, InterviewResponse, InterviewUpdate
+from app.schemas.interview_ai_analysis import InterviewAIAnalysisResponse
+from app.services.interview_intelligence import InterviewIntelligenceService
 from app.services.interview_management import InterviewService
+from app.services.notification import NotificationService
 
 router = APIRouter(prefix="/interviews", tags=["interviews"])
 
@@ -19,6 +25,20 @@ def get_interview_service(db: Session = Depends(get_db)) -> InterviewService:
     return InterviewService(
         InterviewRepository(db),
         ApplicationRepository(db),
+        CompanyMemberRepository(db),
+        notification_service=NotificationService(
+            NotificationRepository(db),
+            CompanyMemberRepository(db),
+        ),
+    )
+
+
+def get_interview_intelligence_service(db: Session = Depends(get_db)) -> InterviewIntelligenceService:
+    return InterviewIntelligenceService(
+        InterviewRepository(db),
+        InterviewAIAnalysisRepository(db),
+        ApplicationRepository(db),
+        ApplicationAIAnalysisRepository(db),
         CompanyMemberRepository(db),
     )
 
@@ -62,6 +82,33 @@ def list_interviews(
 ) -> list[InterviewResponse]:
     try:
         return service.list_interviews(current_user)
+    except Exception as exc:  # noqa: BLE001
+        _handle_service_errors(exc)
+        raise
+
+
+@router.get("/{interview_id}/ai", response_model=InterviewAIAnalysisResponse)
+def get_interview_ai_analysis(
+    interview_id: UUID,
+    current_user: User = Depends(get_current_user),
+    service: InterviewIntelligenceService = Depends(get_interview_intelligence_service),
+) -> InterviewAIAnalysisResponse:
+    try:
+        return service.get_analysis(current_user, interview_id)
+    except Exception as exc:  # noqa: BLE001
+        _handle_service_errors(exc)
+        raise
+
+
+@router.post("/{interview_id}/ai/analyze", response_model=InterviewAIAnalysisResponse)
+def analyze_interview_intelligence(
+    interview_id: UUID,
+    force: bool = Query(default=False, description="Regenerate analysis even if one exists"),
+    current_user: User = Depends(get_current_user),
+    service: InterviewIntelligenceService = Depends(get_interview_intelligence_service),
+) -> InterviewAIAnalysisResponse:
+    try:
+        return service.analyze_interview(current_user, interview_id, force=force)
     except Exception as exc:  # noqa: BLE001
         _handle_service_errors(exc)
         raise

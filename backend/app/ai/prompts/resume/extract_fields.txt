@@ -1,0 +1,12 @@
+Extract structured resume fields from the following resume text.
+
+Resume:
+{{resume_text}}
+
+Return JSON with keys:
+- full_name
+- email
+- phone
+- skills
+- years_experience
+- current_title

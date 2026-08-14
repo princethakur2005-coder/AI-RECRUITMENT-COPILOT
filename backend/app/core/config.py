@@ -124,6 +124,11 @@ class Settings(BaseSettings):
 
     CACHE_DEFAULT_TTL_SECONDS: int = 600
     CACHE_MAX_LOCAL_ENTRIES: int = 2048
+    # In-process read cache for reporting aggregates only. Not Redis.
+    READ_CACHE_ENABLED: bool = Field(default=True, env="READ_CACHE_ENABLED")
+    READ_CACHE_MAX_ENTRIES: int = Field(default=2048, env="READ_CACHE_MAX_ENTRIES")
+    REPORTING_CACHE_TTL_SECONDS: int = Field(default=30, env="REPORTING_CACHE_TTL_SECONDS")
+    DASHBOARD_CACHE_TTL_SECONDS: int = Field(default=30, env="DASHBOARD_CACHE_TTL_SECONDS")
 
     JOB_QUEUE_PREFIX: str = "jobs"
     DISTRIBUTED_LOCK_PREFIX: str = "locks"
@@ -158,6 +163,42 @@ class Settings(BaseSettings):
     MEMORY_LIMIT_MB: int = 0
     GC_COLLECT_INTERVAL_SECONDS: int = 300
 
+    # Email delivery (transport). Credentials from env — never hard-code secrets.
+    EMAIL_DELIVERY_ENABLED: bool = Field(default=False, env="EMAIL_DELIVERY_ENABLED")
+    SMTP_HOST: str | None = Field(default=None, env="SMTP_HOST")
+    SMTP_PORT: int = Field(default=587, env="SMTP_PORT")
+    SMTP_USERNAME: str | None = Field(default=None, env="SMTP_USERNAME")
+    SMTP_USER: str | None = Field(default=None, env="SMTP_USER")  # legacy alias source
+    SMTP_PASSWORD: str | None = Field(default=None, env="SMTP_PASSWORD")
+    SMTP_USE_TLS: bool = Field(default=True, env="SMTP_USE_TLS")
+    SMTP_FROM_EMAIL: str | None = Field(default=None, env="SMTP_FROM_EMAIL")
+    SMTP_FROM: str | None = Field(default=None, env="SMTP_FROM")  # legacy alias source
+    SMTP_FROM_NAME: str | None = Field(default="AI Recruitment Copilot", env="SMTP_FROM_NAME")
+    SMTP_REPLY_TO: str | None = Field(default=None, env="SMTP_REPLY_TO")
+    SMTP_TIMEOUT_SECONDS: int = Field(default=10, env="SMTP_TIMEOUT_SECONDS")
+
+    # Durable background jobs (PostgreSQL source of truth).
+    DURABLE_JOB_DEFAULT_MAX_ATTEMPTS: int = Field(default=5, env="DURABLE_JOB_DEFAULT_MAX_ATTEMPTS")
+    DURABLE_JOB_RETRY_BASE_SECONDS: int = Field(default=30, env="DURABLE_JOB_RETRY_BASE_SECONDS")
+    DURABLE_JOB_RETRY_MAX_SECONDS: int = Field(default=3600, env="DURABLE_JOB_RETRY_MAX_SECONDS")
+    DURABLE_JOB_STALE_RUNNING_SECONDS: int = Field(default=300, env="DURABLE_JOB_STALE_RUNNING_SECONDS")
+    DURABLE_JOB_WORKER_BATCH_SIZE: int = Field(default=10, env="DURABLE_JOB_WORKER_BATCH_SIZE")
+    DURABLE_JOB_WORKER_POLL_SECONDS: float = Field(default=2.0, env="DURABLE_JOB_WORKER_POLL_SECONDS")
+
+    # Outbound webhooks (HTTP delivery via durable jobs).
+    WEBHOOK_HTTP_TIMEOUT_SECONDS: float = Field(default=10.0, env="WEBHOOK_HTTP_TIMEOUT_SECONDS")
+    WEBHOOK_ALLOW_HTTP_LOCALHOST: bool = Field(default=True, env="WEBHOOK_ALLOW_HTTP_LOCALHOST")
+    WEBHOOK_VALIDATE_DNS: bool = Field(default=True, env="WEBHOOK_VALIDATE_DNS")
+    WEBHOOK_SKIP_DNS_VALIDATION: bool = Field(default=False, env="WEBHOOK_SKIP_DNS_VALIDATION")
+
+    @property
+    def smtp_username_effective(self) -> str | None:
+        return (self.SMTP_USERNAME or self.SMTP_USER or None)
+
+    @property
+    def smtp_from_email_effective(self) -> str | None:
+        return (self.SMTP_FROM_EMAIL or self.SMTP_FROM or None)
+
     @property
     def is_debug(self) -> bool:
         return self.DEBUG
@@ -176,12 +217,27 @@ class Settings(BaseSettings):
         hsts_enabled = values.get("HSTS_ENABLED")
         jwt_audience = values.get("JWT_AUDIENCE")
         jwt_issuer = values.get("JWT_ISSUER")
+        email_enabled = values.get("EMAIL_DELIVERY_ENABLED")
+        smtp_host = values.get("SMTP_HOST")
+        smtp_from_email = values.get("SMTP_FROM_EMAIL") or values.get("SMTP_FROM")
+        webhook_allow_localhost = values.get("WEBHOOK_ALLOW_HTTP_LOCALHOST")
+        webhook_skip_dns = values.get("WEBHOOK_SKIP_DNS_VALIDATION")
+        poll_seconds = values.get("DURABLE_JOB_WORKER_POLL_SECONDS")
+        batch_size = values.get("DURABLE_JOB_WORKER_BATCH_SIZE")
+        error_verbosity = values.get("ERROR_VERBOSITY")
+
+        if poll_seconds is not None and float(poll_seconds) <= 0:
+            raise ValueError("DURABLE_JOB_WORKER_POLL_SECONDS must be greater than zero.")
+        if batch_size is not None and int(batch_size) <= 0:
+            raise ValueError("DURABLE_JOB_WORKER_BATCH_SIZE must be greater than zero.")
 
         if not debug:
             if not secret or secret == "change-me-in-production":
                 raise ValueError("SECRET_KEY must be configured for production deployments.")
             if not database_url or database_url == "postgresql+psycopg2://postgres:postgres@localhost:5432/ai_recruitment_copilot":
                 raise ValueError("DATABASE_URL must be configured for production deployments.")
+            if database_url.startswith("sqlite"):
+                raise ValueError("SQLite DATABASE_URL must not be used in production deployments.")
             if not allowed_hosts:
                 raise ValueError("ALLOWED_HOSTS must contain at least one host in production.")
             if not cors_origins:
@@ -192,6 +248,16 @@ class Settings(BaseSettings):
                 raise ValueError("JWT_AUDIENCE must be configured for production deployments.")
             if not jwt_issuer:
                 raise ValueError("JWT_ISSUER must be configured for production deployments.")
+            if email_enabled and (not smtp_host or not smtp_from_email):
+                raise ValueError(
+                    "EMAIL_DELIVERY_ENABLED requires SMTP_HOST and SMTP_FROM_EMAIL in production deployments."
+                )
+            if webhook_allow_localhost:
+                raise ValueError("WEBHOOK_ALLOW_HTTP_LOCALHOST must be false in production deployments.")
+            if webhook_skip_dns:
+                raise ValueError("WEBHOOK_SKIP_DNS_VALIDATION must be false in production deployments.")
+            if error_verbosity == "verbose":
+                raise ValueError("ERROR_VERBOSITY must not be 'verbose' in production deployments.")
 
         return values
 

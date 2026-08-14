@@ -1,0 +1,8 @@
+Prepare interview scheduling notes for the following application.
+
+Candidate: {{candidate_name}}
+Job: {{job_title}}
+Interview type: {{interview_type}}
+Interviewer: {{interviewer_name}}
+
+Provide practical notes for the interviewer.

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
@@ -12,10 +12,13 @@ from app.core.application_status import DEFAULT_APPLICATION_STATUS
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.application_ai_analysis import ApplicationAIAnalysis
+    from app.models.application_hiring_decision import ApplicationHiringDecision
     from app.models.candidate import Candidate
     from app.models.company import Company
     from app.models.interview import Interview
     from app.models.job import Job
+    from app.models.offer import Offer
 
 
 class Application(Base):
@@ -24,6 +27,7 @@ class Application(Base):
     __tablename__ = "applications"
     __table_args__ = (
         UniqueConstraint("candidate_id", "job_id", name="uq_applications_candidate_job"),
+        Index("ix_applications_company_id_applied_at", "company_id", "applied_at"),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -74,3 +78,15 @@ class Application(Base):
     job: Mapped["Job"] = relationship(back_populates="applications")
     candidate: Mapped["Candidate"] = relationship(back_populates="applications")
     interviews: Mapped[list["Interview"]] = relationship(back_populates="application")
+    ai_analysis: Mapped["ApplicationAIAnalysis | None"] = relationship(
+        back_populates="application",
+        uselist=False,
+    )
+    hiring_decision: Mapped["ApplicationHiringDecision | None"] = relationship(
+        back_populates="application",
+        uselist=False,
+    )
+    offers: Mapped[list["Offer"]] = relationship(
+        back_populates="application",
+        cascade="all, delete-orphan",
+    )

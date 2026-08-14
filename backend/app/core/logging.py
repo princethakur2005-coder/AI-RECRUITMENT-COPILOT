@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from contextvars import ContextVar
 from logging.config import dictConfig
 from datetime import datetime, timezone
@@ -9,6 +10,22 @@ from app.core.config import settings
 
 
 request_id_context: ContextVar[str] = ContextVar("request_id", default="-")
+
+
+_SENSITIVE_LOG_PATTERN = re.compile(
+    r"(?i)(password|secret|token|authorization|api[_-]?key|smtp_password|webhook_secret|bearer\s+)[^\s,;]*",
+)
+
+
+class SensitiveDataFilter(logging.Filter):
+    """Redact sensitive values from log messages."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        if _SENSITIVE_LOG_PATTERN.search(message):
+            record.msg = _SENSITIVE_LOG_PATTERN.sub(r"\1***", message)
+            record.args = ()
+        return True
 
 
 class JsonFormatter(logging.Formatter):
@@ -28,6 +45,15 @@ class JsonFormatter(logging.Formatter):
             value = getattr(record, key, None)
             if value is not None:
                 payload[key] = value
+
+        for key in ("provider", "model", "success", "pipeline", "token_usage", "error"):
+            value = getattr(record, key, None)
+            if value is not None:
+                payload[key] = value
+
+        latency_ms = getattr(record, "latency_ms", None)
+        if latency_ms is not None:
+            payload["latency_ms"] = latency_ms
 
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
@@ -73,6 +99,11 @@ def _build_logging_config() -> dict:
     return {
         "version": 1,
         "disable_existing_loggers": False,
+        "filters": {
+            "sensitive_data": {
+                "()": "app.core.logging.SensitiveDataFilter",
+            }
+        },
         "formatters": formatters,
         "handlers": handlers,
         "loggers": {
@@ -80,11 +111,13 @@ def _build_logging_config() -> dict:
                 "handlers": configured_handlers,
                 "level": settings.LOG_LEVEL,
                 "propagate": False,
+                "filters": ["sensitive_data"],
             }
         },
         "root": {
             "handlers": configured_handlers,
             "level": settings.LOG_LEVEL,
+            "filters": ["sensitive_data"],
         },
     }
 

@@ -1,0 +1,8 @@
+Generate a candidate profile summary for recruiter review.
+
+Candidate name: {{candidate_name}}
+Job title: {{job_title}}
+Resume excerpt:
+{{resume_excerpt}}
+
+Return a concise recruiter-facing summary.

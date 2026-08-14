@@ -1,0 +1,28 @@
+Analyze the candidate resume against the job requirements and return structured hiring intelligence.
+
+Job title: {{job_title}}
+Department: {{department}}
+Experience level: {{experience_level}}
+Employment type: {{employment_type}}
+
+Job description:
+{{job_description}}
+
+Resume text:
+{{resume_text}}
+
+Return JSON only with these fields:
+- overall_score (integer 0-100)
+- skills_score (integer 0-100)
+- experience_score (integer 0-100)
+- education_score (integer 0-100)
+- keyword_score (integer 0-100)
+- strengths (array of strings)
+- weaknesses (array of strings)
+- missing_skills (array of strings)
+- matched_skills (array of strings)
+- summary (string, 2-4 sentences)
+- recommendation (string, concise hiring recommendation)
+- confidence (float between 0 and 1)
+
+Score each dimension independently. Base conclusions only on the provided resume and job description.

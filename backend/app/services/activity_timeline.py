@@ -139,11 +139,12 @@ class ActivityTimelineService:
                     "status": notification.status.value,
                     "title": notification.title,
                     "message": notification.message,
-                    "user_id": str(notification.user_id),
+                    "recipient_id": str(notification.recipient_id),
+                    "recipient_type": notification.recipient_type.value,
                 }
             )
 
-            if filters.user_id is not None and notification.user_id != filters.user_id:
+            if filters.user_id is not None and notification.recipient_id != filters.user_id:
                 continue
             if filters.entity_type is not None and filters.entity_type != entity_type:
                 continue

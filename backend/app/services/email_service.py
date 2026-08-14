@@ -1,3 +1,9 @@
+"""AI-assisted recruitment email drafting (content generation only).
+
+This is NOT the application email delivery boundary.
+Outbound transport lives in ``EmailDeliveryService`` / ``email_provider``.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
@@ -6,10 +12,10 @@ from app.services.chat_service import ChatService
 
 
 class EmailService:
-    """Generate professional recruitment emails using the shared ChatService.
+    """Generate professional recruitment email drafts using ChatService.
 
-    Does not mutate global prompt templates; templates are maintained locally
-    to the service for flexibility.
+    Legacy/AI drafting helper. Does not send mail. Prefer
+    ``EmailDeliveryService`` for delivery.
     """
 
     DEFAULT_TEMPLATES = {
@@ -48,7 +54,12 @@ class EmailService:
         if tpl is None:
             raise KeyError(f"Unknown email template: {template}")
 
-        prompt = tpl.format(candidate_name=candidate_name, job_title=job_title, company=company, highlights=highlights or "relevant experience")
+        prompt = tpl.format(
+            candidate_name=candidate_name,
+            job_title=job_title,
+            company=company,
+            highlights=highlights or "relevant experience",
+        )
         prompt = (
             f"{prompt}\n\nTone: {tone}. Keep the email under {max_words} words.\n"
             "Return only the email body text without commentary."
@@ -57,7 +68,6 @@ class EmailService:
         resp = self.chat.send_message(prompt)
         return {"email": resp.get("content", ""), "raw": resp}
 
-    # convenience wrappers
     def outreach(self, **kwargs: Any) -> Dict[str, Any]:
         return self.generate_email(template="reachout", **kwargs)
 
@@ -69,3 +79,7 @@ class EmailService:
 
     def rejection(self, **kwargs: Any) -> Dict[str, Any]:
         return self.generate_email(template="rejection", **kwargs)
+
+
+# Explicit alias clarifying this module's role vs EmailDeliveryService.
+AIEmailDraftService = EmailService

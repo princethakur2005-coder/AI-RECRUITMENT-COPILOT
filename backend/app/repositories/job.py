@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.application import Application
@@ -60,25 +60,35 @@ class JobRepository(BaseRepository[Job]):
     def set_job_intelligence(self, job: Job, intelligence: dict[str, object]) -> Job:
         return self.update(job, {"job_intelligence": intelligence})
 
-    def get_job_counts(self, company_id: UUID) -> dict[str, int]:
-        total = self.db.scalar(
-            select(func.count()).select_from(Job).where(Job.company_id == company_id),
-        ) or 0
-        active = self.db.scalar(
-            select(func.count())
-            .select_from(Job)
-            .where(Job.company_id == company_id, Job.is_active.is_(True)),
-        ) or 0
-        open_jobs = self.db.scalar(
-            select(func.count())
-            .select_from(Job)
-            .where(
-                Job.company_id == company_id,
-                Job.is_active.is_(True),
-                Job.status == "open",
-            ),
-        ) or 0
-        return {"total": int(total), "active": int(active), "open": int(open_jobs)}
+    def get_job_counts(
+        self,
+        company_id: UUID,
+        *,
+        branch_id: UUID | None = None,
+        job_id: UUID | None = None,
+    ) -> dict[str, int]:
+        filters = [Job.company_id == company_id]
+        if branch_id is not None:
+            filters.append(Job.branch_id == branch_id)
+        if job_id is not None:
+            filters.append(Job.id == job_id)
+
+        row = self.db.execute(
+            select(
+                func.count(Job.id),
+                func.coalesce(func.sum(case((Job.is_active.is_(True), 1), else_=0)), 0),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (and_(Job.is_active.is_(True), Job.status == "open"), 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ),
+            ).where(*filters),
+        ).one()
+        return {"total": int(row[0] or 0), "active": int(row[1] or 0), "open": int(row[2] or 0)}
 
     def count_by_department(self, company_id: UUID) -> dict[str, int]:
         rows = self.db.execute(

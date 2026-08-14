@@ -12,6 +12,7 @@ from app.repositories.job import JobRepository
 from app.schemas.job import JobCreate, JobUpdate
 from app.services.base import BaseService
 from app.services.job_intelligence_engine import JobIntelligenceEngine
+from app.services.reporting_cache import invalidate_company_reporting_cache
 
 JOB_ALLOWED_ROLES = frozenset({"company_admin", "recruiter", "hiring_manager"})
 
@@ -79,6 +80,7 @@ class JobService(BaseService[Job]):
             is_active=payload.is_active,
         )
         created = self.repository.create(job)
+        invalidate_company_reporting_cache(membership.company_id)
         return self.refresh_job_intelligence(created)
 
     def list_jobs(self, user: User) -> list[Job]:
@@ -101,6 +103,7 @@ class JobService(BaseService[Job]):
             )
 
         updated = self.repository.update(job, update_data)
+        invalidate_company_reporting_cache(membership.company_id)
         if (
             "description" in update_data
             or "title" in update_data
@@ -113,6 +116,7 @@ class JobService(BaseService[Job]):
         membership = self._resolve_active_membership(user)
         job = self._get_job_for_membership(job_id, membership)
         self.repository.delete(job)
+        invalidate_company_reporting_cache(membership.company_id)
 
     def get_active_jobs(self, company_id: UUID) -> list[Job]:
         return self.repository.get_active_jobs(company_id)

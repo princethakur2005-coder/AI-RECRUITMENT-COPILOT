@@ -1,12 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.application import router as application_router
+from app.api.audit import router as audit_router
 from app.api.public_apply import router as public_apply_router
 from app.api.auth import router as auth_router
 from app.api.assistant import router as assistant_router
 from app.api.candidate import router as candidate_router
+from app.api.candidate_portal import router as candidate_portal_router
 from app.api.branch import router as branch_router
 from app.api.company import router as company_router
 from app.api.company_member import router as company_member_router
@@ -14,9 +17,12 @@ from app.api.dashboard import router as dashboard_router
 from app.api.interview import router as interview_router
 from app.api.job import router as job_router
 from app.api.note import router as note_router
+from app.api.notification import router as notification_router
 from app.api.offer import router as offer_router
 from app.api.search import router as search_router
 from app.api.user import router as user_router
+from app.api.webhook import router as webhook_router
+from app.api.calendar import router as calendar_router
 from app.api.workspace import router as workspace_router
 from app.core.config import settings
 from app.core.exceptions import (
@@ -34,7 +40,13 @@ from app.core.exceptions import (
     external_service_exception_handler,
     unhandled_exception_handler as core_unhandled_exception,
 )
-from app.core.monitoring import dependency_health_report, liveness_report, readiness_report
+from app.core.monitoring import (
+    dependency_health_report,
+    liveness_report,
+    readiness_http_status,
+    readiness_report,
+)
+from app.core.runtime_validation import validate_api_runtime
 from app.middleware.request_logging import request_logging_middleware
 from app.middleware.security import RateLimitMiddleware, SecurityHeadersMiddleware, RequestValidationMiddleware
 from app.middleware.performance import (
@@ -85,14 +97,19 @@ app.include_router(company_router)
 app.include_router(branch_router)
 app.include_router(company_member_router)
 app.include_router(candidate_router)
+app.include_router(candidate_portal_router)
 app.include_router(job_router)
 app.include_router(application_router)
 app.include_router(interview_router)
 app.include_router(note_router)
+app.include_router(notification_router)
 app.include_router(offer_router)
+app.include_router(webhook_router)
+app.include_router(calendar_router)
 app.include_router(assistant_router)
 app.include_router(user_router)
 app.include_router(dashboard_router)
+app.include_router(audit_router)
 app.include_router(search_router)
 app.include_router(workspace_router)
 
@@ -116,10 +133,14 @@ app.add_exception_handler(404, http_exception_handler)
 
 
 @app.on_event("startup")
-def create_tables() -> None:
-    """Auto-create database tables on startup (dev/SQLite friendly)."""
+def on_startup() -> None:
+    """Validate runtime configuration and optionally bootstrap dev tables."""
+    validate_api_runtime(settings)
+    if not settings.DEBUG:
+        return
     from app.db.base import Base
     from app.db.database import engine
+
     Base.metadata.create_all(bind=engine)
 
 
@@ -132,12 +153,17 @@ async def root() -> dict[str, str]:
 
 
 @app.get("/health")
-async def health() -> dict:
-    ready = readiness_report(settings.PROJECT_NAME)
-    return {
-        "status": "ok" if ready.get("status") in {"healthy", "degraded"} else "unhealthy",
-        "service": settings.PROJECT_NAME,
-    }
+async def health() -> JSONResponse:
+    report = readiness_report(settings.PROJECT_NAME)
+    status_code = readiness_http_status(report)
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "ok" if status_code == 200 else "unhealthy",
+            "service": settings.PROJECT_NAME,
+            "ready": report.get("status"),
+        },
+    )
 
 
 @app.get("/health/live")
@@ -146,10 +172,13 @@ async def health_live() -> dict:
 
 
 @app.get("/health/ready")
-async def health_ready() -> dict:
-    return readiness_report(settings.PROJECT_NAME)
+async def health_ready() -> JSONResponse:
+    report = readiness_report(settings.PROJECT_NAME)
+    return JSONResponse(status_code=readiness_http_status(report), content=report)
 
 
-@app.get("/health/dependencies")
-async def health_dependencies() -> dict:
+@app.get("/health/dependencies", response_model=None)
+async def health_dependencies():
+    if not settings.DEBUG:
+        raise HTTPException(status_code=404, detail="Not found")
     return dependency_health_report()

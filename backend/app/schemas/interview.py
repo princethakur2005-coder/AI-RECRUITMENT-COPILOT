@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.interview_status import InterviewStatus
 from app.core.interview_type import InterviewType
@@ -45,7 +45,7 @@ class InterviewInterviewerSummary(BaseModel):
     id: UUID
     user_id: UUID
     full_name: str
-    email: EmailStr
+    email: str
     role: str
 
 

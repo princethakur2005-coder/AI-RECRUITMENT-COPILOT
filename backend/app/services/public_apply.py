@@ -14,6 +14,7 @@ from app.repositories.application import ApplicationRepository
 from app.repositories.candidate import CandidateRepository
 from app.repositories.job import JobRepository
 from app.schemas.public_apply import PublicApplyForm, PublicApplyResponse
+from app.services.reporting_cache import invalidate_company_reporting_cache
 from app.utils.resume_management import ResumeManager
 
 
@@ -84,7 +85,7 @@ class PublicApplyService:
         form: PublicApplyForm,
         resume_path: str,
     ) -> Application:
-        email = str(form.email).strip()
+        email = str(form.email).strip().lower()
         full_name = " ".join(form.full_name.split()).strip()
         first_name, last_name = self._split_name(full_name)
 
@@ -127,6 +128,7 @@ class PublicApplyService:
             self.db.add(application)
             self.db.commit()
             self.db.refresh(application)
+            invalidate_company_reporting_cache(company_id)
             return application
         except DuplicateApplicationError:
             self.db.rollback()

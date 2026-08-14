@@ -1,0 +1,8 @@
+Generate a concise explainable hiring evaluation summary in enterprise tone.
+Use only the provided signals and avoid unsupported claims.
+Return JSON with keys: narrative, key_reasons (array), risk_flags (array).
+
+Candidate: {{candidate_id}}
+Recommendation: {{recommendation}}
+Overall score: {{overall_score}}
+Signals: {{signals_json}}

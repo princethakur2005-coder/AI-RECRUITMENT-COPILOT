@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.core.auth_principals import PRINCIPAL_USER
 from app.core.jwt import create_access_token
 from app.core.security import hash_password, verify_password
 from app.models.user import User
@@ -20,7 +21,7 @@ class AuthenticationService:
         if not verify_password(password, user.hashed_password):
             return None
 
-        return create_access_token(user.id)
+        return create_access_token(user.id, principal=PRINCIPAL_USER)
 
     def register_user(self, full_name: str, email: str, password: str) -> User | None:
         """Create a new user. Returns None if the email is already taken."""

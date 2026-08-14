@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.application import Application
+from app.models.application_ai_analysis import ApplicationAIAnalysis
 from app.repositories.base import BaseRepository
 
 
@@ -19,6 +20,35 @@ class ApplicationRepository(BaseRepository[Application]):
         statement = (
             select(Application)
             .options(joinedload(Application.candidate))
+            .where(
+                Application.id == application_id,
+                Application.company_id == company_id,
+            )
+        )
+        return self.db.scalars(statement).unique().first()
+
+    def get_with_relations_for_company(self, application_id: UUID, company_id: UUID) -> Application | None:
+        statement = (
+            select(Application)
+            .options(
+                joinedload(Application.candidate),
+                joinedload(Application.job),
+            )
+            .where(
+                Application.id == application_id,
+                Application.company_id == company_id,
+            )
+        )
+        return self.db.scalars(statement).unique().first()
+
+    def get_with_intelligence_for_company(self, application_id: UUID, company_id: UUID) -> Application | None:
+        statement = (
+            select(Application)
+            .options(
+                joinedload(Application.candidate),
+                joinedload(Application.job),
+                joinedload(Application.ai_analysis),
+            )
             .where(
                 Application.id == application_id,
                 Application.company_id == company_id,
@@ -54,6 +84,34 @@ class ApplicationRepository(BaseRepository[Application]):
         )
         return list(self.db.scalars(statement).unique().all())
 
+    def list_by_job_id_with_ai_analysis(self, company_id: UUID, job_id: UUID) -> list[Application]:
+        statement = (
+            select(Application)
+            .options(
+                joinedload(Application.candidate),
+                joinedload(Application.ai_analysis),
+            )
+            .where(
+                Application.company_id == company_id,
+                Application.job_id == job_id,
+            )
+            .order_by(Application.applied_at.desc())
+        )
+        return list(self.db.scalars(statement).unique().all())
+
+    def list_analyzed_for_company(self, company_id: UUID) -> list[Application]:
+        statement = (
+            select(Application)
+            .options(
+                joinedload(Application.candidate),
+                joinedload(Application.job),
+                joinedload(Application.ai_analysis),
+            )
+            .join(ApplicationAIAnalysis, ApplicationAIAnalysis.application_id == Application.id)
+            .where(Application.company_id == company_id)
+        )
+        return list(self.db.scalars(statement).unique().all())
+
     def list_by_candidate_id(self, company_id: UUID, candidate_id: UUID) -> list[Application]:
         statement = (
             select(Application)
@@ -65,6 +123,33 @@ class ApplicationRepository(BaseRepository[Application]):
             .order_by(Application.applied_at.desc())
         )
         return list(self.db.scalars(statement).unique().all())
+
+    def list_owned_by_candidate(self, candidate_id: UUID) -> list[Application]:
+        """Candidate-portal: all applications owned by the authenticated candidate."""
+        statement = (
+            select(Application)
+            .options(
+                joinedload(Application.job),
+                joinedload(Application.company),
+            )
+            .where(Application.candidate_id == candidate_id)
+            .order_by(Application.applied_at.desc())
+        )
+        return list(self.db.scalars(statement).unique().all())
+
+    def get_owned_by_candidate(self, application_id: UUID, candidate_id: UUID) -> Application | None:
+        statement = (
+            select(Application)
+            .options(
+                joinedload(Application.job),
+                joinedload(Application.company),
+            )
+            .where(
+                Application.id == application_id,
+                Application.candidate_id == candidate_id,
+            )
+        )
+        return self.db.scalars(statement).unique().first()
 
     def count_by_status(self, company_id: UUID) -> dict[str, int]:
         rows = self.db.execute(

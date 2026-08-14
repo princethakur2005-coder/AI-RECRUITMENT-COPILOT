@@ -108,8 +108,7 @@ def db_exception_handler(request: Request | None, exc: Exception) -> JSONRespons
         return JSONResponse(status_code=HTTP_409_CONFLICT, content=content)
    
     if isinstance(exc, OperationalError):
-        print("FULL DB ERROR:", repr(exc))
-        logger.exception("DB OperationalError request_id=%s detail=%s", request_id, str(exc))
+        logger.exception("DB OperationalError request_id=%s", request_id)
         content = _format_response("db_unavailable", "Database unavailable", request_id, details=None)
         return JSONResponse(status_code=HTTP_503_SERVICE_UNAVAILABLE, content=content)
    

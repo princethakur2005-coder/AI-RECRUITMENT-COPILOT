@@ -32,7 +32,11 @@ ALLOWED_STATUS_TRANSITIONS: dict[ApplicationStatus, frozenset[ApplicationStatus]
     ApplicationStatus.SCREENING: frozenset({ApplicationStatus.SHORTLISTED, ApplicationStatus.REJECTED}),
     ApplicationStatus.SHORTLISTED: frozenset({ApplicationStatus.INTERVIEW, ApplicationStatus.REJECTED}),
     ApplicationStatus.INTERVIEW: frozenset({ApplicationStatus.OFFERED, ApplicationStatus.REJECTED}),
-    ApplicationStatus.OFFERED: frozenset({ApplicationStatus.HIRED, ApplicationStatus.REJECTED}),
+    # OFFERED -> INTERVIEW: current offer failed (withdrawn/rejected/declined); not a terminal reject.
+    # Enables a legitimate revised offer on the same Application without a new status.
+    ApplicationStatus.OFFERED: frozenset(
+        {ApplicationStatus.HIRED, ApplicationStatus.REJECTED, ApplicationStatus.INTERVIEW}
+    ),
     ApplicationStatus.HIRED: frozenset(),
     ApplicationStatus.REJECTED: frozenset(),
 }

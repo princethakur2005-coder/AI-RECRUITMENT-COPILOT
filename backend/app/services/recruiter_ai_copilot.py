@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from typing import Any
+from uuid import UUID
 
+from app.models.user import User
 from app.services.evaluation_intelligence_engine import EvaluationIntelligenceEngine, EvaluationReport
 from app.services.hiring_recommendation import HiringRecommendationRequest, HiringRecommendationService
 from app.services.resume_intelligence_engine import ResumeIntelligenceEngine
@@ -16,12 +18,15 @@ class RecruiterAICopilotRequest:
     full_name: str | None = None
     email: str | None = None
     phone: str | None = None
+    user: User | None = None
+    application_id: UUID | None = None
     evaluation_reports: list[EvaluationReport | dict[str, Any]] = field(default_factory=list)
     hiring_recommendation_result: dict[str, Any] | None = None
     hiring_recommendation_request: HiringRecommendationRequest | None = None
     comparison_candidates: list[dict[str, Any]] = field(default_factory=list)
     comparison_recommendations: list[dict[str, Any]] = field(default_factory=list)
     recruiter_questions: list[str] = field(default_factory=list)
+    use_ai_narrative: bool = False
 
 
 class RecruiterAICopilotService:
@@ -155,8 +160,31 @@ class RecruiterAICopilotService:
     def _resolve_recommendation_result(self, request: RecruiterAICopilotRequest) -> dict[str, Any]:
         if request.hiring_recommendation_result is not None:
             return request.hiring_recommendation_result
-        if request.hiring_recommendation_request is not None and self.hiring_recommendation_service is not None:
-            return self.hiring_recommendation_service.recommend_for_job(request.hiring_recommendation_request)
+        if self.hiring_recommendation_service is None or request.user is None:
+            return {"items": []}
+
+        if request.application_id is not None:
+            recommendation = self.hiring_recommendation_service.recommend_for_application(
+                request.user,
+                request.application_id,
+                persist=False,
+                use_ai_narrative=request.use_ai_narrative,
+            )
+            return {
+                "items": [recommendation],
+                "job_id": recommendation.get("job_id"),
+                "metadata": {"source": "application_hiring_decision"},
+            }
+
+        if request.hiring_recommendation_request is not None:
+            hiring_request = request.hiring_recommendation_request
+            hiring_request.use_ai_narrative = request.use_ai_narrative
+            hiring_request.persist = False
+            return self.hiring_recommendation_service.recommend_for_job(
+                hiring_request,
+                user=request.user,
+            )
+
         return {"items": []}
 
     def _primary_recommendation(self, recommendation_result: dict[str, Any]) -> dict[str, Any]:

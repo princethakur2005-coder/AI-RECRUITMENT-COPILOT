@@ -1,6 +1,17 @@
+"""Legacy multi-channel notification queue (JSON file + optional worker).
+
+Production in-app notifications use PostgreSQL ``NotificationService``.
+Production email transport uses ``EmailDeliveryService`` / ``email_provider``.
+
+This module remains for older AI-screening enqueue paths. Prefer
+``EmailDeliveryService.send`` for new code. Do not treat this queue as the
+notification source of truth.
+"""
+
 from __future__ import annotations
 
 import json
+import logging
 import os
 import smtplib
 import threading
@@ -10,6 +21,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger("app.notification_center")
 
 
 class NotificationChannel:
@@ -224,6 +237,7 @@ def enqueue_notification(channel: str, payload: Dict[str, Any], max_attempts: in
 
 
 def send_email_async(to: str, subject: str, body: str, html: bool = False, frm: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> str:
+    """Legacy enqueue helper. New code should use EmailDeliveryService.send()."""
     payload = {"to": to, "subject": subject, "body": body, "html": html, "from": frm}
     if metadata:
         payload["metadata"] = metadata

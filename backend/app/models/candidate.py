@@ -76,6 +76,8 @@ class Candidate(Base):
     portfolio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="new")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Nullable so public Apply can create Candidate rows before portal account activation.
+    hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -92,7 +94,7 @@ class Candidate(Base):
     job: Mapped["Job | None"] = relationship(back_populates="candidates")
     applications: Mapped[list["Application"]] = relationship(back_populates="candidate")
     notes: Mapped[list["Note"]] = relationship(back_populates="candidate", cascade="all, delete-orphan")
-    offers: Mapped[list["Offer"]] = relationship(back_populates="candidate", cascade="all, delete-orphan")
+    offers: Mapped[list["Offer"]] = relationship(back_populates="candidate")
 
     @property
     def recruiter_notes(self) -> list[RecruiterNotePayload]:

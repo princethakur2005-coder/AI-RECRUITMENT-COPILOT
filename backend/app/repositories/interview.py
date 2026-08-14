@@ -55,6 +55,35 @@ class InterviewRepository(BaseRepository[Interview]):
         )
         return list(self.db.scalars(statement).unique().all())
 
+    def list_owned_by_candidate(self, candidate_id: UUID) -> list[Interview]:
+        """Candidate-portal: interviews for applications owned by the candidate."""
+        statement = (
+            select(Interview)
+            .options(
+                *self._base_query_options(),
+                joinedload(Interview.company),
+            )
+            .join(Application, Interview.application_id == Application.id)
+            .where(Application.candidate_id == candidate_id)
+            .order_by(Interview.scheduled_start.asc())
+        )
+        return list(self.db.scalars(statement).unique().all())
+
+    def get_owned_by_candidate(self, interview_id: UUID, candidate_id: UUID) -> Interview | None:
+        statement = (
+            select(Interview)
+            .options(
+                *self._base_query_options(),
+                joinedload(Interview.company),
+            )
+            .join(Application, Interview.application_id == Application.id)
+            .where(
+                Interview.id == interview_id,
+                Application.candidate_id == candidate_id,
+            )
+        )
+        return self.db.scalars(statement).unique().first()
+
     def count_by_application_id(self, application_id: UUID) -> int:
         total = self.db.scalar(
             select(func.count())
