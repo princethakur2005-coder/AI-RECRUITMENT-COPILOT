@@ -8,6 +8,7 @@ from app.core.notification import (
     NotificationRecipientType,
     NotificationStatus,
 )
+from app.core.read_query_bounds import MAX_NOTIFICATION_LIMIT, clamp_limit, clamp_offset
 from app.models.candidate import Candidate
 from app.models.notification import Notification
 from app.models.user import User
@@ -257,8 +258,10 @@ class NotificationService:
         filters: NotificationFilter | None,
     ) -> NotificationListResponse:
         query = filters or NotificationFilter()
+        bounded_offset = clamp_offset(query.offset)
+        bounded_limit = clamp_limit(query.limit, maximum=MAX_NOTIFICATION_LIMIT)
         # Over-fetch when preference filtering may drop rows, then page in-memory.
-        fetch_limit = min(max(query.limit + query.offset, query.limit) * 3, 500)
+        fetch_limit = min(max(bounded_limit + bounded_offset, bounded_limit) * 3, MAX_NOTIFICATION_LIMIT)
         fetch_filters = NotificationFilter(
             category=query.category,
             priority=query.priority,
@@ -288,7 +291,7 @@ class NotificationService:
             )
         ]
         total = len(visible)
-        page = visible[query.offset : query.offset + query.limit]
+        page = visible[bounded_offset : bounded_offset + bounded_limit]
         unread_count = sum(1 for item in visible if item.status == NotificationStatus.UNREAD)
         return NotificationListResponse(
             items=page,

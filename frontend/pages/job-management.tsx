@@ -16,12 +16,15 @@ import {
   Header,
   Input,
   JobApplicationPipeline,
+  JobCandidateRankingPanel,
+  JobHiringRecommendationsPanel,
   LoadingState,
   Pagination,
   Section,
   Select,
   Stack,
   Table,
+  Tabs,
 } from "../components";
 
 
@@ -642,61 +645,97 @@ export default function JobManagementPage() {
                       </div>
                     </Alert>
 
-                    <AnalyticsWidget title="Application Pipeline" description="Track candidates through the hiring pipeline for this job">
-                      <JobApplicationPipeline jobId={String(selectedJob.id)} />
-                    </AnalyticsWidget>
+                    <Tabs.Root defaultValue="pipeline">
+                      <Tabs.List>
+                        <Tabs.Trigger value="pipeline">Application Pipeline</Tabs.Trigger>
+                        <Tabs.Trigger value="ranking">AI Ranking</Tabs.Trigger>
+                        <Tabs.Trigger value="hiring">Hiring Recommendations</Tabs.Trigger>
+                        <Tabs.Trigger value="intelligence">Job Intelligence</Tabs.Trigger>
+                      </Tabs.List>
 
-                    <AnalyticsWidget title="AI Job Intelligence Summary" description="Summary generated from job intelligence pipeline">
-                      {intelligence.summary ? (
-                        <Alert tone="info" description={intelligence.summary} />
-                      ) : (
-                        <EmptyState title="No AI summary" description="AI intelligence summary is not available for this job." />
-                      )}
-                    </AnalyticsWidget>
+                      <Tabs.Panel value="pipeline">
+                        <AnalyticsWidget
+                          title="Application Pipeline"
+                          description="Track candidates through the hiring pipeline for this job"
+                        >
+                          <JobApplicationPipeline jobId={String(selectedJob.id)} />
+                        </AnalyticsWidget>
+                      </Tabs.Panel>
 
-                    <AnalyticsWidget title="Required vs Preferred Skills" description="Relative weighting of must-have and nice-to-have skills">
-                      {requiredSkillRows.length || preferredSkillRows.length ? (
-                        <div className="job-management-skills">
-                          {requiredSkillRows.map((skill) => (
-                            <div key={`required-${skill.label}`} className="job-management-skill-row">
-                              <span className="job-management-skill-label">Required: {skill.label}</span>
-                              <span className="job-management-skill-track">
-                                <span className="job-management-skill-fill" style={{ width: `${skill.value}%` }} />
-                              </span>
-                              <span className="job-management-skill-value">{skill.value}%</span>
-                            </div>
-                          ))}
-                          {preferredSkillRows.map((skill) => (
-                            <div key={`preferred-${skill.label}`} className="job-management-skill-row">
-                              <span className="job-management-skill-label">Preferred: {skill.label}</span>
-                              <span className="job-management-skill-track">
-                                <span
-                                  className="job-management-skill-fill"
-                                  style={{
-                                    width: `${skill.value}%`,
-                                    background: "var(--color-status-info)",
-                                  }}
-                                />
-                              </span>
-                              <span className="job-management-skill-value">{skill.value}%</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <EmptyState title="No skills visualization" description="Required/preferred skills are not available for this job." />
-                      )}
-                    </AnalyticsWidget>
+                      <Tabs.Panel value="ranking">
+                        <AnalyticsWidget
+                          title="AI Candidate Ranking"
+                          description="Ranked from stored resume intelligence analysis (no re-analysis)"
+                        >
+                          <JobCandidateRankingPanel jobId={String(selectedJob.id)} />
+                        </AnalyticsWidget>
+                      </Tabs.Panel>
 
-                    <AnalyticsWidget title="Candidate Match Summary" description="Current matching signal from intelligence and recommendation outputs">
-                      {intelligence.candidateMatchSummary ? (
-                        <Alert tone="success" description={intelligence.candidateMatchSummary} />
-                      ) : (
-                        <EmptyState
-                          title="No candidate match summary"
-                          description="Candidate match summary is not available for this job yet."
-                        />
-                      )}
-                    </AnalyticsWidget>
+                      <Tabs.Panel value="hiring">
+                        <AnalyticsWidget
+                          title="Hiring Recommendations"
+                          description="Ranked hiring decisions from stored intelligence signals"
+                        >
+                          <JobHiringRecommendationsPanel jobId={String(selectedJob.id)} />
+                        </AnalyticsWidget>
+                      </Tabs.Panel>
+
+                      <Tabs.Panel value="intelligence">
+                        <Stack gap="4">
+                          <AnalyticsWidget title="AI Job Intelligence Summary" description="Summary generated from job intelligence pipeline">
+                            {intelligence.summary ? (
+                              <Alert tone="info" description={intelligence.summary} />
+                            ) : (
+                              <EmptyState title="No AI summary" description="AI intelligence summary is not available for this job." />
+                            )}
+                          </AnalyticsWidget>
+
+                          <AnalyticsWidget title="Required vs Preferred Skills" description="Relative weighting of must-have and nice-to-have skills">
+                            {requiredSkillRows.length || preferredSkillRows.length ? (
+                              <div className="job-management-skills">
+                                {requiredSkillRows.map((skill) => (
+                                  <div key={`required-${skill.label}`} className="job-management-skill-row">
+                                    <span className="job-management-skill-label">Required: {skill.label}</span>
+                                    <span className="job-management-skill-track">
+                                      <span className="job-management-skill-fill" style={{ width: `${skill.value}%` }} />
+                                    </span>
+                                    <span className="job-management-skill-value">{skill.value}%</span>
+                                  </div>
+                                ))}
+                                {preferredSkillRows.map((skill) => (
+                                  <div key={`preferred-${skill.label}`} className="job-management-skill-row">
+                                    <span className="job-management-skill-label">Preferred: {skill.label}</span>
+                                    <span className="job-management-skill-track">
+                                      <span
+                                        className="job-management-skill-fill"
+                                        style={{
+                                          width: `${skill.value}%`,
+                                          background: "var(--color-status-info)",
+                                        }}
+                                      />
+                                    </span>
+                                    <span className="job-management-skill-value">{skill.value}%</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <EmptyState title="No skills visualization" description="Required/preferred skills are not available for this job." />
+                            )}
+                          </AnalyticsWidget>
+
+                          <AnalyticsWidget title="Candidate Match Summary" description="Current matching signal from intelligence and recommendation outputs">
+                            {intelligence.candidateMatchSummary ? (
+                              <Alert tone="success" description={intelligence.candidateMatchSummary} />
+                            ) : (
+                              <EmptyState
+                                title="No candidate match summary"
+                                description="Candidate match summary is not available for this job yet."
+                              />
+                            )}
+                          </AnalyticsWidget>
+                        </Stack>
+                      </Tabs.Panel>
+                    </Tabs.Root>
 
                     <Section>
                       <Stack gap="2">

@@ -118,7 +118,7 @@ def test_legacy_dashboard_routes_forbid_interviewer(api_client, world: OfferWorl
 def test_health_dependencies_hidden_outside_debug(monkeypatch) -> None:
     import app.core.config as config_module
 
-    monkeypatch.setattr(config_module.settings, "DEBUG", False)
+    monkeypatch.setattr(config_module.get_settings(), "DEBUG", False)
     response = TestClient(app).get("/health/dependencies")
     assert response.status_code == 404
 
@@ -126,7 +126,7 @@ def test_health_dependencies_hidden_outside_debug(monkeypatch) -> None:
 def test_health_dependencies_available_in_debug(monkeypatch) -> None:
     import app.core.config as config_module
 
-    monkeypatch.setattr(config_module.settings, "DEBUG", True)
+    monkeypatch.setattr(config_module.get_settings(), "DEBUG", True)
     response = TestClient(app).get("/health/dependencies")
     assert response.status_code == 200
     assert "dependencies" in response.json()

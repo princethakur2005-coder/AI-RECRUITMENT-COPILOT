@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "../components/core/Button";
+import { setAuthSession } from "../lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,14 +23,19 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = (await res.json()) as { access_token?: string; detail?: string };
+      const data = (await res.json()) as {
+        access_token?: string;
+        principal?: string;
+        detail?: string;
+        message?: string;
+      };
 
       if (!res.ok) {
-        setError(data.detail ?? "Login failed. Please try again.");
+        setError(data.detail ?? data.message ?? "Login failed. Please try again.");
         return;
       }
 
-      localStorage.setItem("access_token", data.access_token ?? "");
+      setAuthSession(data.access_token ?? "", data.principal === "candidate" ? "candidate" : "user");
       void router.replace("/dashboard");
     } catch {
       setError("Network error. Please check your connection.");
@@ -59,7 +65,7 @@ export default function LoginPage() {
         </div>
 
         <h1 className="auth-heading">Welcome back</h1>
-        <p className="auth-subheading">Sign in to your account to continue</p>
+        <p className="auth-subheading">Sign in to your recruiter account to continue</p>
 
         <form className="auth-form" onSubmit={(e) => void handleSubmit(e)} noValidate>
           {error && <div className="auth-error" role="alert">{error}</div>}
@@ -106,6 +112,11 @@ export default function LoginPage() {
           <span>
             Don&apos;t have an account?{" "}
             <Link href="/signup" className="auth-link">Create one</Link>
+          </span>
+          <div className="auth-divider">or</div>
+          <span>
+            Looking for the candidate portal?{" "}
+            <Link href="/candidate-login" className="auth-link">Candidate sign in</Link>
           </span>
         </div>
       </div>

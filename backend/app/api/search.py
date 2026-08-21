@@ -54,7 +54,7 @@ def recruiter_search(
     q: str = Query("", max_length=200),
     branch_id: UUID | None = Query(None),
     types: str | None = Query(None, description="Comma-separated: candidate,job,application"),
-    offset: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0, le=10_000),
     limit: int = Query(20, ge=1, le=50),
     current_user: User = Depends(get_current_user),
     service: SearchService = Depends(get_search_service),

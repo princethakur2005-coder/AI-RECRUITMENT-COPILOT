@@ -68,10 +68,14 @@ class DurableJobRepository(BaseRepository[DurableJob]):
         stale_before: datetime,
     ) -> list[DurableJob]:
         """Return abandoned RUNNING jobs to retryable state for worker recovery."""
-        statement = select(DurableJob).where(
-            DurableJob.status == DurableJobStatus.RUNNING.value,
-            DurableJob.locked_at.is_not(None),
-            DurableJob.locked_at < stale_before,
+        statement = (
+            select(DurableJob)
+            .where(
+                DurableJob.status == DurableJobStatus.RUNNING.value,
+                DurableJob.locked_at.is_not(None),
+                DurableJob.locked_at < stale_before,
+            )
+            .with_for_update(skip_locked=True)
         )
         stale_jobs = list(self.db.scalars(statement).all())
         recovered: list[DurableJob] = []

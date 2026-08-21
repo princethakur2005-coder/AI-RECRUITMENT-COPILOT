@@ -67,7 +67,7 @@ class SearchRepository:
             self._candidate_base(company_id, pattern, branch_id=branch_id)
             .order_by(Candidate.full_name.asc(), Candidate.id.asc())
             .offset(max(0, offset))
-            .limit(max(0, limit))
+            .limit(max(1, limit))
         )
         return list(self.db.scalars(statement).unique().all())
 
@@ -110,7 +110,7 @@ class SearchRepository:
             )
             .order_by(Job.title.asc(), Job.id.asc())
             .offset(max(0, offset))
-            .limit(max(0, limit))
+            .limit(max(1, limit))
         )
         return list(self.db.scalars(statement).all())
 
@@ -187,7 +187,7 @@ class SearchRepository:
             )
             .order_by(Candidate.full_name.asc(), Application.id.asc())
             .offset(max(0, offset))
-            .limit(max(0, limit))
+            .limit(max(1, limit))
         )
         return list(self.db.scalars(statement).unique().all())
 

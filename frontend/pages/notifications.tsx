@@ -41,7 +41,7 @@ interface NotificationResponse {
   unread?: number;
 }
 
-const NOTIFICATIONS_ENDPOINT = "/notifications";
+const NOTIFICATIONS_ENDPOINT = "/api/notifications";
 
 function formatDate(value?: string): string {
   if (!value) return "-";
@@ -155,7 +155,7 @@ export default function NotificationsPage() {
 
   const patchNotification = async (id: string, payload: Record<string, unknown>) => {
     await authFetch(`${NOTIFICATIONS_ENDPOINT}/${id}`, {
-      method: "PUT",
+      method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
@@ -175,10 +175,11 @@ export default function NotificationsPage() {
   };
 
   const markAllAsRead = async () => {
-    const unread = notifications.filter((item) => !item.read);
-    if (!unread.length) return;
-
-    await Promise.all(unread.map((item) => patchNotification(item.id, { read: true })));
+    if (!totals.unread) return;
+    await authFetch(`${NOTIFICATIONS_ENDPOINT}/read-all`, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+    });
     await loadNotifications();
   };
 

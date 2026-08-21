@@ -85,3 +85,31 @@ class JobExecutionError(Exception):
         super().__init__(message)
         self.retryable = retryable
         self.error_code = error_code
+
+
+_SENSITIVE_ERROR_MARKERS = (
+    "password",
+    "secret",
+    "token",
+    "jwt",
+    "authorization",
+    "credentials",
+    "postgresql",
+    "smtp",
+    "api_key",
+    "bearer",
+)
+
+
+def sanitize_job_error_message(message: str | None, *, max_length: int = 2000) -> str | None:
+    """Redact sensitive fragments before persisting or returning job errors."""
+    if message is None:
+        return None
+    trimmed = str(message).strip()
+    if not trimmed:
+        return None
+    trimmed = trimmed[:max_length]
+    lowered = trimmed.lower()
+    if any(marker in lowered for marker in _SENSITIVE_ERROR_MARKERS):
+        return "Job execution failed"
+    return trimmed

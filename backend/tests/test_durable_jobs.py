@@ -212,3 +212,131 @@ def test_successful_handler_marks_job_succeeded(job_db: Session) -> None:
     row = job_db.scalar(select(DurableJob).where(DurableJob.idempotency_key == "ok:1"))
     assert row is not None
     assert row.status == DurableJobStatus.SUCCEEDED.value
+
+
+def test_running_job_is_not_claimed_by_another_worker(job_db: Session) -> None:
+    service = _service(job_db)
+    now = datetime.now(timezone.utc)
+    running = DurableJob(
+        job_type="test.running",
+        status=DurableJobStatus.RUNNING.value,
+        payload_json={},
+        attempt_count=0,
+        max_attempts=3,
+        locked_at=now,
+        locked_by="worker-a",
+    )
+    job_db.add(running)
+    job_db.commit()
+
+    claimed = service.claim_next(worker_id="worker-b")
+    assert claimed is None
+
+
+def test_execute_claimed_skips_terminal_jobs(job_db: Session) -> None:
+    service = _service(job_db)
+    calls = {"count": 0}
+
+    def _handler(_job: DurableJob) -> None:
+        calls["count"] += 1
+
+    service.register_handler("test.terminal", _handler)
+    completed = DurableJob(
+        job_type="test.terminal",
+        status=DurableJobStatus.SUCCEEDED.value,
+        payload_json={},
+        attempt_count=1,
+        max_attempts=3,
+        completed_at=datetime.now(timezone.utc),
+    )
+    job_db.add(completed)
+    job_db.commit()
+
+    response = service.execute_claimed(completed)
+    assert response.status == DurableJobStatus.SUCCEEDED
+    assert calls["count"] == 0
+
+
+def test_stale_recovery_does_not_touch_recent_running_jobs(job_db: Session) -> None:
+    service = _service(job_db)
+    now = datetime.now(timezone.utc)
+    running = DurableJob(
+        job_type="test.active",
+        status=DurableJobStatus.RUNNING.value,
+        payload_json={},
+        attempt_count=0,
+        max_attempts=5,
+        locked_at=now - timedelta(seconds=30),
+        locked_by="active-worker",
+    )
+    job_db.add(running)
+    job_db.commit()
+
+    recovered = service.recover_stale_jobs(now=now)
+    assert recovered == 0
+    job_db.refresh(running)
+    assert running.status == DurableJobStatus.RUNNING.value
+    assert running.locked_by == "active-worker"
+
+
+def test_sensitive_handler_errors_are_redacted(job_db: Session) -> None:
+    service = _service(job_db)
+
+    def _fail(_job: DurableJob) -> None:
+        raise JobExecutionError("smtp_password=super-secret failed", retryable=True, error_code="smtp")
+
+    service.register_handler("test.secret", _fail)
+    service.submit(
+        DurableJobSubmit(job_type="test.secret", payload={}, idempotency_key="secret:1", max_attempts=3),
+    )
+    DurableJobWorker(service, worker_id="w1").process_one()
+
+    row = job_db.scalar(select(DurableJob).where(DurableJob.idempotency_key == "secret:1"))
+    assert row is not None
+    assert row.error_message == "Job execution failed"
+    assert "super-secret" not in (row.error_message or "")
+
+
+def test_payload_secrets_are_stripped_on_submission(job_db: Session) -> None:
+    service = _service(job_db)
+    created = service.submit(
+        DurableJobSubmit(
+            job_type=DurableJobType.EMAIL_DELIVERY,
+            payload={"notification_id": str(uuid4()), "smtp_password": "secret"},
+            idempotency_key="payload:1",
+        )
+    )
+    row = job_db.get(DurableJob, created.id)
+    assert row is not None
+    assert "smtp_password" not in row.payload_json
+    assert "secret" not in str(row.payload_json)
+
+
+def test_worker_isolates_handler_failures_and_continues_batch(job_db: Session) -> None:
+    service = _service(job_db)
+
+    def _fail(_job: DurableJob) -> None:
+        raise RuntimeError("handler exploded")
+
+    service.register_handler("test.batch_fail", _fail)
+    service.register_handler("test.batch_ok", lambda _job: None)
+    service.submit(DurableJobSubmit(job_type="test.batch_fail", payload={}, idempotency_key="batch:fail"))
+    service.submit(DurableJobSubmit(job_type="test.batch_ok", payload={}, idempotency_key="batch:ok"))
+
+    processed = DurableJobWorker(service, worker_id="w1").process_batch(max_jobs=2)
+    assert processed == 2
+
+    failed = job_db.scalar(select(DurableJob).where(DurableJob.idempotency_key == "batch:fail"))
+    ok = job_db.scalar(select(DurableJob).where(DurableJob.idempotency_key == "batch:ok"))
+    assert failed is not None
+    assert ok is not None
+    assert failed.status == DurableJobStatus.FAILED_RETRYABLE.value
+    assert ok.status == DurableJobStatus.SUCCEEDED.value
+
+
+def test_worker_graceful_shutdown_stops_polling(job_db: Session) -> None:
+    service = _service(job_db)
+    worker = DurableJobWorker(service, worker_id="shutdown-worker", poll_interval_seconds=0.01)
+    worker.request_shutdown()
+    worker.run_forever()
+    assert worker._shutdown.is_set()

@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.core.durable_job import DurableJobStatus, DurableJobType
+from app.core.durable_job import DurableJobStatus, DurableJobType, sanitize_job_error_message
 
 
 class DurableJobSubmit(BaseModel):
@@ -30,9 +30,13 @@ class DurableJobSubmit(BaseModel):
             "refresh_token",
             "jwt",
             "secret",
+            "signing_secret",
+            "webhook_secret",
             "api_key",
             "smtp_password",
             "authorization",
+            "credentials",
+            "credentials_sealed",
         }
         cleaned: dict[str, Any] = {}
         for key, item in (value or {}).items():
@@ -84,7 +88,7 @@ class DurableJobResponse(BaseModel):
             locked_at=row.locked_at,
             locked_by=row.locked_by,
             error_code=row.error_code,
-            error_message=row.error_message,
+            error_message=sanitize_job_error_message(row.error_message),
             idempotency_key=row.idempotency_key,
             correlation_id=row.correlation_id,
             company_id=row.company_id,

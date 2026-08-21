@@ -2,10 +2,12 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "../components/core/Button";
+import { setAuthSession } from "../lib/api";
 
 export default function SignupPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -23,6 +25,11 @@ export default function SignupPage() {
 
     if (password.length < 6) {
       setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (!companyName.trim()) {
+      setError("Company name is required.");
       return;
     }
 
@@ -44,11 +51,38 @@ export default function SignupPage() {
 
       if (!res.ok) {
         const message = data?.detail ?? data?.message ?? "Registration failed. Please try again.";
-        setError(message);
+        setError(typeof message === "string" ? message : "Registration failed. Please try again.");
         return;
       }
 
-      localStorage.setItem("access_token", data?.access_token ?? "");
+      const accessToken = data?.access_token ?? "";
+      setAuthSession(accessToken, "user");
+
+      // Existing company onboarding API — required for tenant-scoped dashboard/jobs.
+      const companyRes = await fetch("/companies", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ name: companyName.trim() }),
+      });
+
+      if (!companyRes.ok) {
+        let companyError: { detail?: string; message?: string } | null = null;
+        try {
+          companyError = (await companyRes.json()) as { detail?: string; message?: string };
+        } catch {
+          companyError = null;
+        }
+        setError(
+          companyError?.detail ??
+            companyError?.message ??
+            "Account created, but company setup failed. Please try again from settings.",
+        );
+        return;
+      }
+
       void router.replace("/dashboard");
     } catch (error) {
       const message = error instanceof Error && error.message ? error.message : "Network error. Please check your connection.";
@@ -94,6 +128,20 @@ export default function SignupPage() {
               placeholder="Jane Smith"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="companyName">Company name</label>
+            <input
+              id="companyName"
+              className="auth-input"
+              type="text"
+              autoComplete="organization"
+              placeholder="Acme Hiring"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
               required
             />
           </div>

@@ -172,21 +172,12 @@ def dependency_health_report() -> dict[str, Any]:
     }
 
 
-def readiness_report(service_name: str) -> dict[str, Any]:
+def readiness_report() -> dict[str, Any]:
     deps = dependency_health_report()
-    status = deps.get("status", READINESS_HEALTHY)
-    payload: dict[str, Any] = {
-        "status": status,
-        "service": service_name,
+    return {
+        "status": deps.get("status", READINESS_HEALTHY),
         "dependencies": deps.get("dependencies", {}),
     }
-    if settings.METRICS_ENABLED:
-        metrics_registry.update_resource_placeholders()
-        payload["monitoring"] = {
-            "enabled": True,
-            "metrics": metrics_registry.snapshot(),
-        }
-    return payload
 
 
 def readiness_http_status(report: dict[str, Any]) -> int:
@@ -198,8 +189,5 @@ def readiness_http_status(report: dict[str, Any]) -> int:
     return 503
 
 
-def liveness_report(service_name: str) -> dict[str, Any]:
-    return {
-        "status": "ok",
-        "service": service_name,
-    }
+def liveness_report() -> dict[str, str]:
+    return {"status": "ok"}

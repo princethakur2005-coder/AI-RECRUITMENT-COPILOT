@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { authFetch } from "../lib/api";
+import { InterviewAIAnalysisPanel } from "./InterviewAIAnalysisPanel";
 import {
   Alert,
   Badge,
@@ -40,6 +41,8 @@ export interface InterviewRecord {
     role: string;
   } | null;
   application?: {
+    id?: string;
+    status?: string;
     candidate_name?: string | null;
     job_title?: string | null;
   } | null;
@@ -77,6 +80,7 @@ export function ApplicationInterviewPanel({
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [expandedAiInterviewId, setExpandedAiInterviewId] = useState<string | null>(null);
 
   const [editForm, setEditForm] = useState({
     interview_type: "phone" as InterviewType,
@@ -343,6 +347,33 @@ export function ApplicationInterviewPanel({
                 </Button>
               </div>
             )}
+
+            {interview.status === "completed" ? (
+              <div className="application-interview-ai-panel">
+                <div className="job-application-card-actions">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() =>
+                      setExpandedAiInterviewId((current) =>
+                        current === interview.id ? null : interview.id,
+                      )
+                    }
+                  >
+                    {expandedAiInterviewId === interview.id
+                      ? "Hide intelligence"
+                      : "Interview intelligence"}
+                  </Button>
+                </div>
+                {expandedAiInterviewId === interview.id ? (
+                  <InterviewAIAnalysisPanel
+                    interviewId={interview.id}
+                    interviewStatus={interview.status}
+                    applicationStatus={applicationStatus ?? interview.application?.status}
+                  />
+                ) : null}
+              </div>
+            ) : null}
           </Stack>
         </div>
       ))}

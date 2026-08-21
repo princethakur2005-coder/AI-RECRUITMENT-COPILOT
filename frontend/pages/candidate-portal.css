@@ -28,6 +28,20 @@
   flex-wrap: wrap;
 }
 
+.candidate-text-clamp {
+  display: inline-block;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.candidate-text-wrap {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .candidate-portal-toolbar {
   display: grid;
   gap: var(--space-3);

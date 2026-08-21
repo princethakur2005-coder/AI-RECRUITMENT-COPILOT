@@ -1,12 +1,18 @@
 import { useEffect } from "react";
 import { useRouter } from "next/router";
+import { getAccessToken, getAuthPrincipal } from "../lib/api";
 
 export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    void router.replace(token ? "/dashboard" : "/login");
+    const token = getAccessToken();
+    const principal = getAuthPrincipal();
+    if (!token) {
+      void router.replace("/login");
+      return;
+    }
+    void router.replace(principal === "candidate" ? "/candidate-portal" : "/dashboard");
   }, [router]);
 
   return null;

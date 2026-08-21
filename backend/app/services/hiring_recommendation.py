@@ -213,16 +213,96 @@ class HiringRecommendationService:
             raise LookupError("Hiring decision not found")
         return self._to_decision_response(decision, is_stale=self._is_decision_stale(decision, membership.company_id))
 
+    @staticmethod
+    def _score_for_recommendation_label(recommendation: str) -> int:
+        return {
+            "Strong Hire": 90,
+            "Hire": 75,
+            "Consider": 60,
+            "Reject": 25,
+        }.get(recommendation, 50)
+
+    def _bootstrap_recruiter_decision(
+        self,
+        *,
+        company_id: UUID,
+        application_id: UUID,
+        user: User,
+        recommendation: str,
+        reason: str,
+        comment: str | None,
+    ) -> ApplicationHiringDecision:
+        """Create a recruiter-authored decision when AI generation is unavailable.
+
+        Offer gating and override semantics still apply via recruiter_override /
+        recommendation. Does not invent AI analysis output.
+        """
+        application = self.signal_assembler.application_repository.get_by_id_for_company(
+            application_id,
+            company_id,
+        )
+        if application is None:
+            raise LookupError("Application not found")
+
+        now = datetime.now(timezone.utc)
+        score = self._score_for_recommendation_label(recommendation)
+        override_payload = {
+            "recommendation": recommendation,
+            "reason": reason,
+            "comment": comment,
+            "overridden_by_user_id": str(user.id),
+            "overridden_at": now.isoformat(),
+            "original_recommendation": None,
+        }
+        decision = ApplicationHiringDecision(
+            application_id=application_id,
+            recommendation=recommendation,
+            overall_score=score,
+            decision_confidence={
+                "overall": 1.0,
+                "ranking_confidence": 0.0,
+                "semantic_confidence": 0.0,
+                "evaluation_confidence": 0.0,
+            },
+            strengths=[],
+            weaknesses=[],
+            missing_mandatory_qualifications=[],
+            risk_factors=[],
+            reasons={
+                "ranking_contribution": 0.0,
+                "evaluation_contribution": 0.0,
+                "semantic_contribution": 0.0,
+                "risk_penalty": 0.0,
+                "final_score": round(score / 100.0, 3),
+            },
+            recruiter_metadata={
+                "summary": f"Recruiter decision: {recommendation}",
+                "next_step_hint": reason,
+                "ranking_position": None,
+            },
+            ai_hiring_summary=None,
+            decision_detail={
+                "source": {"type": "recruiter_override_bootstrap"},
+                "policy": {"policy_version": POLICY_VERSION},
+            },
+            recruiter_override=override_payload,
+            policy_version=POLICY_VERSION,
+            created_at=now,
+            updated_at=now,
+        )
+        return self.hiring_decision_repository.create(decision)
+
     def apply_recruiter_override(
         self,
         user: User,
         application_id: UUID,
         payload: HiringDecisionOverrideRequest,
     ) -> ApplicationHiringDecisionResponse:
-        """Persist an authorized recruiter override on the existing hiring decision.
+        """Persist an authorized recruiter override on a hiring decision.
 
-        Does not regenerate AI output. Offer gating reads the override via
-        OfferService._effective_hiring_recommendation.
+        When no AI decision exists yet, bootstraps a recruiter-authored decision so
+        the existing offer/hiring gates can proceed without fabricating AI output.
+        Offer gating reads the override via OfferService._effective_hiring_recommendation.
         """
         membership = self._resolve_active_membership(user)
         company_id = membership.company_id
@@ -241,10 +321,18 @@ class HiringRecommendationService:
             application_id,
             company_id,
         )
-        if decision is None:
-            raise LookupError("Hiring decision not found")
-
         now = datetime.now(timezone.utc)
+        if decision is None:
+            created = self._bootstrap_recruiter_decision(
+                company_id=company_id,
+                application_id=application_id,
+                user=user,
+                recommendation=recommendation,
+                reason=reason,
+                comment=payload.comment,
+            )
+            return self._to_decision_response(created, is_stale=False)
+
         existing_override = decision.recruiter_override if isinstance(decision.recruiter_override, dict) else None
         original_recommendation = (
             str(existing_override.get("original_recommendation") or "").strip()

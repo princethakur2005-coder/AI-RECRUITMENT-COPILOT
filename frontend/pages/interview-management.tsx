@@ -10,6 +10,7 @@ import {
   EmptyState,
   ErrorState,
   Header,
+  InterviewAIAnalysisPanel,
   LoadingState,
   Section,
   Select,
@@ -43,6 +44,7 @@ export default function InterviewManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [actionId, setActionId] = useState<string | null>(null);
+  const [aiPanelInterviewId, setAiPanelInterviewId] = useState<string | null>(null);
 
   const loadInterviews = useCallback(async () => {
     setLoading(true);
@@ -70,6 +72,11 @@ export default function InterviewManagementPage() {
     if (statusFilter === "all") return interviews;
     return interviews.filter((item) => item.status === statusFilter);
   }, [interviews, statusFilter]);
+
+  const aiPanelInterview = useMemo(
+    () => interviews.find((item) => item.id === aiPanelInterviewId) ?? null,
+    [interviews, aiPanelInterviewId],
+  );
 
   const updateStatus = async (interviewId: string, status: InterviewStatus) => {
     setActionId(interviewId);
@@ -179,6 +186,19 @@ export default function InterviewManagementPage() {
                           </Button>
                         </>
                       ) : null}
+                      {interview.status === "completed" ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() =>
+                            setAiPanelInterviewId((current) =>
+                              current === interview.id ? null : interview.id,
+                            )
+                          }
+                        >
+                          {aiPanelInterviewId === interview.id ? "Hide intelligence" : "Interview intelligence"}
+                        </Button>
+                      ) : null}
                     </Stack>
                   ),
                 }))}
@@ -190,6 +210,25 @@ export default function InterviewManagementPage() {
                 description="Schedule interviews from the job application pipeline or application detail page."
               />
             )}
+
+            {aiPanelInterview ? (
+              <Section elevated>
+                <Stack gap="3">
+                  <h2 className="recruiter-dashboard-title">
+                    Interview intelligence — {aiPanelInterview.application?.candidate_name ?? "Candidate"}
+                  </h2>
+                  <p className="job-application-card-meta">
+                    {formatStatus(aiPanelInterview.interview_type)} ·{" "}
+                    {formatDateTime(aiPanelInterview.scheduled_start)}
+                  </p>
+                  <InterviewAIAnalysisPanel
+                    interviewId={aiPanelInterview.id}
+                    interviewStatus={aiPanelInterview.status}
+                    applicationStatus={aiPanelInterview.application?.status}
+                  />
+                </Stack>
+              </Section>
+            ) : null}
           </Stack>
         ) : null}
       </ContentContainer>

@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.interview_status import InterviewStatus
 from app.core.offer_status import OfferStatus
 from app.core.read_cache import CacheBackend, get_read_cache
+from app.core.read_query_bounds import validate_bounded_date_range
 from app.models.user import User
 from app.repositories.branch import BranchRepository
 from app.repositories.company_member import CompanyMemberRepository
@@ -76,9 +77,15 @@ class ReportingService:
         cache = self._cache_backend()
         cached = cache.get(key)
         if cached is not None:
-            return model_cls.model_validate(cached)
+            try:
+                return model_cls.model_validate(cached)
+            except Exception:
+                cache.delete(key)
         result = loader()
-        cache.set(key, result.model_dump(mode="json"), ttl=self._cache_ttl())
+        try:
+            cache.set(key, result.model_dump(mode="json"), ttl=self._cache_ttl())
+        except Exception:
+            pass
         return result
 
     def _resolve_active_membership(self, user: User):
@@ -111,8 +118,7 @@ class ReportingService:
 
         date_from = self._ensure_utc(date_from)
         date_to = self._ensure_utc(date_to)
-        if date_from is not None and date_to is not None and date_from > date_to:
-            raise ValueError("date_from must be less than or equal to date_to")
+        validate_bounded_date_range(date_from, date_to)
 
         if branch_id is not None:
             branch = self.branch_repository.get_by_id(branch_id)

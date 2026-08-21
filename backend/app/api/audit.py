@@ -61,14 +61,14 @@ def _to_event(row: AuditEvent) -> AuditLogEvent:
 
 @router.get("", response_model=AuditLogListResponse)
 def list_audit_logs(
-    action: str | None = Query(None),
-    resource_type: str | None = Query(None),
+    action: str | None = Query(None, max_length=100),
+    resource_type: str | None = Query(None, max_length=100),
     resource_id: UUID | None = Query(None),
     actor_id: UUID | None = Query(None),
-    actor_type: str | None = Query(None),
+    actor_type: str | None = Query(None, max_length=100),
     created_after: datetime | None = Query(None),
     created_before: datetime | None = Query(None),
-    offset: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0, le=10_000),
     limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     service: AuditService = Depends(get_audit_service),

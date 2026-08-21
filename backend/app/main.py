@@ -1,7 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
 
 from app.api.application import router as application_router
 from app.api.audit import router as audit_router
@@ -23,8 +22,9 @@ from app.api.search import router as search_router
 from app.api.user import router as user_router
 from app.api.webhook import router as webhook_router
 from app.api.calendar import router as calendar_router
+from app.api.health import router as health_router
 from app.api.workspace import router as workspace_router
-from app.core.config import settings
+from app.core.config import get_settings, settings
 from app.core.exceptions import (
     AppException,
     app_exception_handler,
@@ -39,12 +39,6 @@ from app.core.exceptions import (
     db_exception_handler,
     external_service_exception_handler,
     unhandled_exception_handler as core_unhandled_exception,
-)
-from app.core.monitoring import (
-    dependency_health_report,
-    liveness_report,
-    readiness_http_status,
-    readiness_report,
 )
 from app.core.runtime_validation import validate_api_runtime
 from app.middleware.request_logging import request_logging_middleware
@@ -64,6 +58,9 @@ import app.models  # noqa: F401, E402
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.API_VERSION,
+    docs_url="/docs" if settings.DEBUG else None,
+    redoc_url="/redoc" if settings.DEBUG else None,
+    openapi_url="/openapi.json" if settings.DEBUG else None,
 )
 
 app.add_middleware(RequestCorrelationMiddleware)
@@ -112,6 +109,7 @@ app.include_router(dashboard_router)
 app.include_router(audit_router)
 app.include_router(search_router)
 app.include_router(workspace_router)
+app.include_router(health_router)
 
 app.add_exception_handler(AppException, app_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
@@ -135,8 +133,9 @@ app.add_exception_handler(404, http_exception_handler)
 @app.on_event("startup")
 def on_startup() -> None:
     """Validate runtime configuration and optionally bootstrap dev tables."""
-    validate_api_runtime(settings)
-    if not settings.DEBUG:
+    runtime_settings = get_settings()
+    validate_api_runtime(runtime_settings)
+    if not runtime_settings.DEBUG:
         return
     from app.db.base import Base
     from app.db.database import engine
@@ -150,35 +149,3 @@ async def root() -> dict[str, str]:
         "status": "running",
         "message": settings.PROJECT_NAME,
     }
-
-
-@app.get("/health")
-async def health() -> JSONResponse:
-    report = readiness_report(settings.PROJECT_NAME)
-    status_code = readiness_http_status(report)
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "status": "ok" if status_code == 200 else "unhealthy",
-            "service": settings.PROJECT_NAME,
-            "ready": report.get("status"),
-        },
-    )
-
-
-@app.get("/health/live")
-async def health_live() -> dict:
-    return liveness_report(settings.PROJECT_NAME)
-
-
-@app.get("/health/ready")
-async def health_ready() -> JSONResponse:
-    report = readiness_report(settings.PROJECT_NAME)
-    return JSONResponse(status_code=readiness_http_status(report), content=report)
-
-
-@app.get("/health/dependencies", response_model=None)
-async def health_dependencies():
-    if not settings.DEBUG:
-        raise HTTPException(status_code=404, detail="Not found")
-    return dependency_health_report()

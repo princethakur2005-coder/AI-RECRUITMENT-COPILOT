@@ -48,21 +48,11 @@ class NotificationPreferenceService:
         payload: NotificationPreferenceUpdate,
     ) -> NotificationPreferenceResponse:
         membership = self._require_active_membership(user)
-        row = self.preference_repository.get_for_staff(
+        row = self.preference_repository.get_or_create_for_staff(
             user_id=user.id,
             company_id=membership.company_id,
+            commit=False,
         )
-        if row is None:
-            row = NotificationPreference(
-                recipient_type=NotificationRecipientType.USER.value,
-                recipient_id=user.id,
-                company_id=membership.company_id,
-                email_enabled=True,
-                in_app_enabled=True,
-                email_disabled_categories_json=[],
-                in_app_disabled_categories_json=[],
-            )
-            row = self.preference_repository.create(row, commit=False)
         updated = self._apply_update(row, payload)
         return NotificationPreferenceResponse.from_orm_row(updated)
 
@@ -77,18 +67,10 @@ class NotificationPreferenceService:
         candidate: Candidate,
         payload: NotificationPreferenceUpdate,
     ) -> NotificationPreferenceResponse:
-        row = self.preference_repository.get_for_candidate(candidate_id=candidate.id)
-        if row is None:
-            row = NotificationPreference(
-                recipient_type=NotificationRecipientType.CANDIDATE.value,
-                recipient_id=candidate.id,
-                company_id=None,
-                email_enabled=True,
-                in_app_enabled=True,
-                email_disabled_categories_json=[],
-                in_app_disabled_categories_json=[],
-            )
-            row = self.preference_repository.create(row, commit=False)
+        row = self.preference_repository.get_or_create_for_candidate(
+            candidate_id=candidate.id,
+            commit=False,
+        )
         updated = self._apply_update(row, payload)
         return NotificationPreferenceResponse.from_orm_row(updated)
 

@@ -8,6 +8,14 @@ from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
 from app.main import app
+from app.middleware.security import reset_rate_limit_state
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limit_buckets():
+    reset_rate_limit_state()
+    yield
+    reset_rate_limit_state()
 
 
 @pytest.fixture(scope="session")
@@ -42,34 +50,59 @@ def event_loop():
 # Database test override placeholder. Tests that require DB should import get_db and use this fixture
 @pytest.fixture
 def db_session(monkeypatch):
-    """Provide a lightweight transactional DB session using sqlite in-memory for tests.
-
-    This is a placeholder: if the application uses SQLAlchemy, tests can override with a proper
-    test engine and create tables as needed.
-    """
+    """Provide a lightweight transactional DB session using sqlite in-memory for tests."""
     try:
-        from sqlalchemy import create_engine
+        from sqlalchemy import create_engine, event
         from sqlalchemy.orm import sessionmaker
+        from sqlalchemy.pool import StaticPool
+
+        import app.models  # noqa: F401
+        from app.db.base import Base
         from app.db.database import get_db
     except Exception:
-        # If SQLAlchemy or app DB modules are not available, provide a no-op fixture
         yield None
         return
 
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    @event.listens_for(engine, "connect")
+    def _fk_on(dbapi_connection, _connection_record):  # noqa: ANN001
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+    Base.metadata.create_all(bind=engine)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
 
     def override_get_db():
         db = SessionLocal()
         try:
             yield db
+        except Exception:
+            db.rollback()
+            raise
         finally:
+            db.rollback()
             db.close()
 
     monkeypatch.setattr(app, "dependency_overrides", getattr(app, "dependency_overrides", {}))
     app.dependency_overrides[get_db] = override_get_db
 
-    yield SessionLocal
+    session = SessionLocal()
+    try:
+        yield session
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.rollback()
+        session.close()
+        engine.dispose()
+        app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.fixture

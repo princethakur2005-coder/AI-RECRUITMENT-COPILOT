@@ -15,6 +15,7 @@ from app.core.durable_job import (
     DurableJobType,
     JobExecutionError,
     TERMINAL_JOB_STATUSES,
+    sanitize_job_error_message,
     validate_job_transition,
 )
 from app.models.durable_job import DurableJob
@@ -89,6 +90,15 @@ class DurableJobService:
         return self.repository.claim_next(worker_id=worker_id, now=now, job_types=job_types)
 
     def execute_claimed(self, job: DurableJob) -> DurableJobResponse:
+        current_status = DurableJobStatus(job.status)
+        if current_status != DurableJobStatus.RUNNING:
+            logger.warning(
+                "durable_job_execute_skipped job_id=%s status=%s",
+                job.id,
+                job.status,
+            )
+            return DurableJobResponse.from_orm_job(job)
+
         handler = self._handlers.get(job.job_type)
         if handler is None:
             return self._finalize_permanent_failure(
@@ -101,19 +111,20 @@ class DurableJobService:
             handler(job)
             return self._finalize_success(job)
         except JobExecutionError as exc:
+            safe_message = sanitize_job_error_message(str(exc)) or "Job execution failed"
             if exc.retryable:
                 return self._finalize_retryable_failure(
                     job,
                     error_code=exc.error_code or "job_failed",
-                    error_message=str(exc),
+                    error_message=safe_message,
                 )
             return self._finalize_permanent_failure(
                 job,
                 error_code=exc.error_code or "job_failed_permanent",
-                error_message=str(exc),
+                error_message=safe_message,
             )
         except Exception as exc:
-            logger.exception(
+            logger.error(
                 "durable_job_handler_error job_id=%s job_type=%s error_type=%s",
                 job.id,
                 job.job_type,
@@ -122,7 +133,7 @@ class DurableJobService:
             return self._finalize_retryable_failure(
                 job,
                 error_code=type(exc).__name__,
-                error_message=str(exc)[:500],
+                error_message=sanitize_job_error_message(str(exc)) or "Job execution failed",
             )
 
     def recover_stale_jobs(self, *, now: datetime | None = None) -> int:
@@ -191,6 +202,7 @@ class DurableJobService:
 
         next_run = self._compute_next_run_at(attempt, now)
         validate_job_transition(DurableJobStatus(job.status), DurableJobStatus.FAILED_RETRYABLE)
+        error_message = sanitize_job_error_message(error_message) or "Job execution failed"
         updated = self.repository.update(
             job,
             {
@@ -200,7 +212,7 @@ class DurableJobService:
                 "locked_at": None,
                 "locked_by": None,
                 "error_code": error_code,
-                "error_message": error_message[:2000],
+                "error_message": error_message,
                 "updated_at": now,
             },
         )
@@ -216,6 +228,7 @@ class DurableJobService:
     ) -> DurableJobResponse:
         now = datetime.now(timezone.utc)
         validate_job_transition(DurableJobStatus(job.status), DurableJobStatus.FAILED_PERMANENT)
+        error_message = sanitize_job_error_message(error_message) or "Job execution failed"
         updated = self.repository.update(
             job,
             {
@@ -225,7 +238,7 @@ class DurableJobService:
                 "locked_at": None,
                 "locked_by": None,
                 "error_code": error_code,
-                "error_message": error_message[:2000],
+                "error_message": error_message,
                 "updated_at": now,
             },
         )

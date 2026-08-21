@@ -28,13 +28,6 @@ class AuthenticationService:
         if self.user_repository.email_exists(email):
             return None
 
-        print("=" * 60)
-        print("REGISTER DEBUG")
-        print("PASSWORD:", repr(password))
-        print("TYPE:", type(password))
-        print("LENGTH:", len(password) if isinstance(password, str) else "NOT A STRING")
-        print("=" * 60)
-
         hashed = hash_password(password)
         return self.user_repository.create_user(full_name, email, hashed)
 

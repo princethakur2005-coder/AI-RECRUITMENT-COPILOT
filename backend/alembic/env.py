@@ -5,7 +5,7 @@ from sqlalchemy.engine import Connection
 
 from app.core.config import settings
 from app.db.base import Base
-from app.models import Candidate, Job, Note, Offer, User
+import app.models  # noqa: F401 — register all models for migration metadata
 
 from alembic import context
 

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/router";
 
-import { authFetch } from "../lib/api";
+import { authFetch } from "../../lib/api";
 import {
   AppLayout,
+  ApplicationAIAnalysisPanel,
+  ApplicationHiringDecisionPanel,
   ApplicationInterviewPanel,
   Badge,
   Button,
@@ -14,7 +16,7 @@ import {
   LoadingState,
   Section,
   Stack,
-} from "../components";
+} from "../../components";
 
 interface ApplicationDetail {
   id: string;
@@ -121,6 +123,20 @@ export default function ApplicationDetailPage() {
                 }}
               />
             ) : null}
+
+            <Section elevated>
+              <Stack gap="3">
+                <h2 className="recruiter-dashboard-title">AI Resume Analysis</h2>
+                <ApplicationAIAnalysisPanel applicationId={application.id} />
+              </Stack>
+            </Section>
+
+            <Section elevated>
+              <Stack gap="3">
+                <h2 className="recruiter-dashboard-title">Hiring Decision</h2>
+                <ApplicationHiringDecisionPanel applicationId={application.id} />
+              </Stack>
+            </Section>
 
             <Section elevated>
               <Stack gap="3">

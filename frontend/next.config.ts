@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        // Prefer `/api/:path*` for endpoints that collide with frontend pages
+        // (e.g. `/api/notifications` → backend `/notifications`).
         source: "/api/:path*",
         destination: `${API_BASE_URL}/:path*`,
       },
@@ -16,6 +18,10 @@ const nextConfig: NextConfig = {
       {
         source: "/candidates/:path*",
         destination: `${API_BASE_URL}/candidates/:path*`,
+      },
+      {
+        source: "/candidate/:path*",
+        destination: `${API_BASE_URL}/candidate/:path*`,
       },
       {
         source: "/jobs/:path*",

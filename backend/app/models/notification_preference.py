@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON, Uuid
 
@@ -33,6 +33,14 @@ class NotificationPreference(Base):
             "ix_notification_preferences_recipient",
             "recipient_type",
             "recipient_id",
+        ),
+        Index(
+            "uq_notification_preferences_candidate_recipient",
+            "recipient_type",
+            "recipient_id",
+            unique=True,
+            postgresql_where=text("company_id IS NULL"),
+            sqlite_where=text("company_id IS NULL"),
         ),
     )
 

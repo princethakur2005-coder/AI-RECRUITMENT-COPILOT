@@ -89,7 +89,7 @@ def update_my_notification_preferences(
 def list_my_notifications(
     status_filter: NotificationStatus | None = Query(default=None, alias="status"),
     limit: int = Query(default=50, ge=1, le=500),
-    offset: int = Query(default=0, ge=0),
+    offset: int = Query(default=0, ge=0, le=10_000),
     current_user: User = Depends(get_current_user),
     service: NotificationService = Depends(get_notification_service),
 ) -> NotificationListResponse:

@@ -13,6 +13,13 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import AUDIT_READ_ROLES, sanitize_audit_metadata
 from app.core.logging import get_request_id
+from app.core.read_query_bounds import (
+    MAX_AUDIT_LIMIT,
+    clamp_limit,
+    clamp_offset,
+    normalize_filter_text,
+    validate_bounded_date_range,
+)
 from app.models.audit_event import AuditEvent
 from app.models.user import User
 from app.repositories.audit_event import AuditEventRepository
@@ -334,25 +341,28 @@ class AuditService:
         if membership.role not in AUDIT_READ_ROLES:
             raise PermissionError("Insufficient permissions for audit logs")
         company_id = membership.company_id
+        bounded_offset = clamp_offset(offset)
+        bounded_limit = clamp_limit(limit, maximum=MAX_AUDIT_LIMIT)
+        validate_bounded_date_range(created_after, created_before)
         items = self.repository.list_for_company(
             company_id,
-            action=action,
-            resource_type=resource_type,
+            action=normalize_filter_text(action),
+            resource_type=normalize_filter_text(resource_type),
             resource_id=resource_id,
             actor_id=actor_id,
-            actor_type=actor_type,
+            actor_type=normalize_filter_text(actor_type),
             created_after=created_after,
             created_before=created_before,
-            offset=offset,
-            limit=limit,
+            offset=bounded_offset,
+            limit=bounded_limit,
         )
         total = self.repository.count_for_company(
             company_id,
-            action=action,
-            resource_type=resource_type,
+            action=normalize_filter_text(action),
+            resource_type=normalize_filter_text(resource_type),
             resource_id=resource_id,
             actor_id=actor_id,
-            actor_type=actor_type,
+            actor_type=normalize_filter_text(actor_type),
             created_after=created_after,
             created_before=created_before,
         )

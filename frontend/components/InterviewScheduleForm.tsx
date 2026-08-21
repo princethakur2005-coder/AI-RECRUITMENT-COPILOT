@@ -159,8 +159,12 @@ export function InterviewScheduleForm({
   };
 
   return (
-    <FormWrapper title="Schedule Interview" description="Book an interview for this application.">
+    <FormWrapper aria-labelledby="schedule-interview-heading">
       <Stack gap="3">
+        <div>
+          <strong id="schedule-interview-heading">Schedule Interview</strong>
+          <p className="job-application-card-meta">Book an interview for this application.</p>
+        </div>
         {error ? <Alert tone="danger" description={error} /> : null}
 
         <Select

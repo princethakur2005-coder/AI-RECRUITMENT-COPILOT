@@ -11,10 +11,11 @@ from app.repositories.company_member import CompanyMemberRepository
 from app.repositories.search import SearchRepository
 from app.schemas.search import RecruiterSearchEntityType, RecruiterSearchHit, RecruiterSearchResponse
 from app.services.recruiter_dashboard import DASHBOARD_ALLOWED_ROLES
+from app.core.read_query_bounds import MAX_SEARCH_LIMIT, clamp_limit, clamp_offset
 
 MIN_QUERY_LENGTH = 2
 DEFAULT_LIMIT = 20
-MAX_LIMIT = 50
+MAX_LIMIT = MAX_SEARCH_LIMIT
 
 _ENTITY_ORDER = (
     RecruiterSearchEntityType.CANDIDATE,
@@ -110,8 +111,8 @@ class SearchService:
         company_id = membership.company_id
         resolved_branch = self._resolve_branch(company_id, branch_id)
         normalized = (query or "").strip()
-        offset = max(0, offset)
-        limit = max(1, min(limit, MAX_LIMIT))
+        offset = clamp_offset(offset)
+        limit = clamp_limit(limit, maximum=MAX_LIMIT)
         requested = types or set(_ENTITY_ORDER)
 
         if len(normalized) < MIN_QUERY_LENGTH:

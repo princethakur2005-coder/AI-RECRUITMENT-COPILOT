@@ -137,8 +137,7 @@ def test_liveness_does_not_require_database() -> None:
     response = client.get("/health/live")
     assert response.status_code == 200
     payload = response.json()
-    assert payload["status"] == "ok"
-    assert payload["service"]
+    assert payload == {"status": "ok"}
 
 
 def test_readiness_checks_database_and_returns_status(monkeypatch) -> None:
@@ -146,7 +145,6 @@ def test_readiness_checks_database_and_returns_status(monkeypatch) -> None:
     response = client.get("/health/ready")
     assert response.status_code in {200, 503}
     payload = response.json()
-    assert payload["service"]
     assert "dependencies" in payload
     assert "database" in payload["dependencies"]
     assert payload["dependencies"]["database"]["status"] in {"healthy", "unhealthy"}
@@ -163,6 +161,31 @@ def test_readiness_failure_returns_service_unavailable(monkeypatch) -> None:
     response = client.get("/health/ready")
     assert response.status_code == 503
     assert response.json()["status"] == "unhealthy"
+
+
+def test_development_settings_remain_valid(monkeypatch) -> None:
+    _reload_config(monkeypatch, DEBUG="true")
+    import app.core.config as config_module
+
+    validate_api_runtime(config_module.settings)
+
+
+def test_health_endpoints_do_not_leak_sensitive_configuration() -> None:
+    client = TestClient(app)
+    sensitive_markers = (
+        "postgresql",
+        "password",
+        "secret_key",
+        "smtp_password",
+        "redis://",
+        "database_url",
+        "monitoring",
+    )
+    for path in ("/health/live", "/health/ready", "/health"):
+        response = client.get(path)
+        body = response.text.lower()
+        for marker in sensitive_markers:
+            assert marker not in body
 
 
 def test_unhandled_api_error_is_safe_in_production(monkeypatch) -> None:

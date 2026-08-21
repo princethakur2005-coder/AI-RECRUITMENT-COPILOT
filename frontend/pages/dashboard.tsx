@@ -97,12 +97,30 @@ interface DashboardUpcomingInterviewsResponse {
   interviews_today_count: number;
 }
 
+interface TopCandidate {
+  rank: number;
+  overall_rank_score: number;
+  candidate_name?: string | null;
+  job_id: string;
+  job_title?: string | null;
+  application_id: string;
+  recommendation?: string | null;
+  confidence?: number | null;
+  overall_score?: number | null;
+}
+
+interface TopCandidatesResponse {
+  candidates: TopCandidate[];
+  generated_at: string;
+}
+
 const ENDPOINTS = {
   stats: "/dashboard/stats",
   jobs: "/dashboard/jobs",
   pipeline: "/dashboard/pipeline",
   recentApplications: "/dashboard/recent-applications",
   upcomingInterviews: "/dashboard/upcoming-interviews",
+  topCandidates: "/dashboard/top-candidates",
 } as const;
 
 const PIPELINE_STATUS_ORDER = [
@@ -150,6 +168,7 @@ export default function RecruiterDashboardPage() {
   const [pipeline, setPipeline] = useState<DashboardPipelineResponse | null>(null);
   const [recentApplications, setRecentApplications] = useState<DashboardApplication[]>([]);
   const [upcomingInterviews, setUpcomingInterviews] = useState<DashboardUpcomingInterview[]>([]);
+  const [topCandidates, setTopCandidates] = useState<TopCandidate[]>([]);
   const [interviewsTodayCount, setInterviewsTodayCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -159,21 +178,30 @@ export default function RecruiterDashboardPage() {
     setError(null);
 
     try {
-      const [statsRes, jobsRes, pipelineRes, recentRes, upcomingRes] = await Promise.all([
+      const [statsRes, jobsRes, pipelineRes, recentRes, upcomingRes, topCandidatesRes] = await Promise.all([
         authFetch(ENDPOINTS.stats, { method: "GET" }),
         authFetch(ENDPOINTS.jobs, { method: "GET" }),
         authFetch(ENDPOINTS.pipeline, { method: "GET" }),
         authFetch(ENDPOINTS.recentApplications, { method: "GET" }),
         authFetch(ENDPOINTS.upcomingInterviews, { method: "GET" }),
+        authFetch(ENDPOINTS.topCandidates, { method: "GET" }),
       ]);
 
-      if (!statsRes.ok || !jobsRes.ok || !pipelineRes.ok || !recentRes.ok || !upcomingRes.ok) {
+      if (
+        !statsRes.ok ||
+        !jobsRes.ok ||
+        !pipelineRes.ok ||
+        !recentRes.ok ||
+        !upcomingRes.ok ||
+        !topCandidatesRes.ok
+      ) {
         const failed = [
           !statsRes.ok ? `stats (${statsRes.status})` : null,
           !jobsRes.ok ? `jobs (${jobsRes.status})` : null,
           !pipelineRes.ok ? `pipeline (${pipelineRes.status})` : null,
           !recentRes.ok ? `recent applications (${recentRes.status})` : null,
           !upcomingRes.ok ? `upcoming interviews (${upcomingRes.status})` : null,
+          !topCandidatesRes.ok ? `top candidates (${topCandidatesRes.status})` : null,
         ]
           .filter(Boolean)
           .join(", ");
@@ -185,12 +213,14 @@ export default function RecruiterDashboardPage() {
       const pipelineData = (await pipelineRes.json()) as DashboardPipelineResponse;
       const recentData = (await recentRes.json()) as DashboardRecentApplicationsResponse;
       const upcomingData = (await upcomingRes.json()) as DashboardUpcomingInterviewsResponse;
+      const topCandidatesData = (await topCandidatesRes.json()) as TopCandidatesResponse;
 
       setStats(statsData);
       setJobsPayload(jobsData);
       setPipeline(pipelineData);
       setRecentApplications(recentData.applications ?? []);
       setUpcomingInterviews(upcomingData.interviews ?? []);
+      setTopCandidates(topCandidatesData.candidates ?? []);
       setInterviewsTodayCount(upcomingData.interviews_today_count ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard");
@@ -199,6 +229,7 @@ export default function RecruiterDashboardPage() {
       setPipeline(null);
       setRecentApplications([]);
       setUpcomingInterviews([]);
+      setTopCandidates([]);
       setInterviewsTodayCount(0);
     } finally {
       setLoading(false);
@@ -335,6 +366,39 @@ export default function RecruiterDashboardPage() {
                     />
                   ) : (
                     <EmptyState title="No upcoming interviews" description="Scheduled interviews will appear here." />
+                  )}
+                </Stack>
+              </Section>
+            </section>
+
+            <section aria-label="Top candidates section">
+              <Section elevated>
+                <Stack gap="3">
+                  <h2 className="recruiter-dashboard-title">Top Candidates</h2>
+                  {topCandidates.length ? (
+                    <Table
+                      columns={[
+                        { key: "rank", header: "Rank" },
+                        { key: "candidate", header: "Candidate" },
+                        { key: "job", header: "Job" },
+                        { key: "score", header: "Rank Score", align: "right" },
+                        { key: "recommendation", header: "Recommendation" },
+                      ]}
+                      data={topCandidates.map((candidate) => ({
+                        id: candidate.application_id,
+                        rank: `#${candidate.rank}`,
+                        candidate: candidate.candidate_name ?? "—",
+                        job: candidate.job_title ?? "—",
+                        score: candidate.overall_rank_score.toFixed(1),
+                        recommendation: candidate.recommendation ?? "—",
+                      }))}
+                      rowKey="id"
+                    />
+                  ) : (
+                    <EmptyState
+                      title="No ranked candidates yet"
+                      description="Run AI resume analysis on applications to populate ranking."
+                    />
                   )}
                 </Stack>
               </Section>

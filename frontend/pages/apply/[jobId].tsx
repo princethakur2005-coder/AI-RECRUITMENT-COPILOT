@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { Button } from "../components/core/Button";
+import { Button } from "../../components/core/Button";
 
 interface PublicApplySuccess {
   application_id: string;

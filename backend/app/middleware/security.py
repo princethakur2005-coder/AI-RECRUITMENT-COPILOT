@@ -11,6 +11,8 @@ from starlette.responses import JSONResponse, Response
 
 from app.core.config import settings
 
+_rate_limit_instances: list["RateLimitMiddleware"] = []
+
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Simple IP-based rate limiting for production and development."""
@@ -20,6 +22,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._requests: dict[str, deque[float]] = defaultdict(deque)
         self.limit = settings.RATE_LIMIT_REQUESTS
         self.window = settings.RATE_LIMIT_WINDOW_SECONDS
+        _rate_limit_instances.append(self)
+
+    def reset_buckets(self) -> None:
+        self._requests.clear()
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         client_ip = self._get_client_ip(request)
@@ -53,6 +59,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if forwarded:
             return forwarded.split(",")[0].strip()
         return request.client.host if request.client else "127.0.0.1"
+
+
+def reset_rate_limit_state() -> None:
+    for middleware in _rate_limit_instances:
+        middleware.reset_buckets()
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
