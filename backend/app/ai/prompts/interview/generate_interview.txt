@@ -1,0 +1,31 @@
+﻿Generate a role-tailored technical and behavioral interview for a candidate applying to this position.
+
+Job Title: {{job_title}}
+
+Job Description:
+{{job_description}}
+
+Requirements:
+{{requirements}}
+
+Candidate Background:
+{{candidate_summary}}
+
+Instructions:
+1. Generate between 3 and 5 role-specific interview questions.
+2. Include both technical questions tailored to the required tech stack and architectural responsibilities, as well as behavioral/situational questions assessing teamwork, problem-solving, and adaptability.
+3. For each question, specify the category (technical or behavioral), the competency being evaluated, and evaluation criteria / rubric.
+
+Return JSON only adhering strictly to the schema:
+{
+  "interview_title": "Role Interview Title",
+  "questions": [
+    {
+      "id": "q1",
+      "question": "Question prompt text...",
+      "category": "technical",
+      "competency": "System Design",
+      "rubric": "Looks for understanding of scalability and database indexing."
+    }
+  ]
+}

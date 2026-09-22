@@ -175,20 +175,32 @@ class CandidateRankingService:
         membership = self._resolve_active_membership(user)
         company_id = membership.company_id
 
-        applications = self.application_repository.list_analyzed_for_company(company_id)
+        applications = self.application_repository.list_for_dashboard(company_id)
 
-        ranked: list[tuple[Application, ApplicationAIAnalysis, float]] = []
+        ranked: list[tuple[Application, float, str | None, float | None, int | None]] = []
         for application in applications:
-            analysis = application.ai_analysis
-            if analysis is None:
-                continue
-            ranked.append((application, analysis, calculate_overall_rank_score(analysis)))
+            if application.composite_score is not None:
+                score = float(application.composite_score)
+                dec = application.hiring_decision_json or {}
+                rec = dec.get("recommendation") or "hire"
+                conf = 0.95
+                overall_int = int(round(score))
+                ranked.append((application, score, rec, conf, overall_int))
+            elif application.ai_analysis is not None:
+                analysis = application.ai_analysis
+                score = calculate_overall_rank_score(analysis)
+                ranked.append((application, score, analysis.recommendation, analysis.confidence, analysis.overall_score))
+            elif any(s is not None for s in (application.fit_score, application.assessment_score, application.interview_score)):
+                avail = [float(s) for s in (application.fit_score, application.assessment_score, application.interview_score) if s is not None]
+                score = round(sum(avail) / len(avail), 1)
+                rec = "hire" if score >= 70.0 else ("review" if score >= 55.0 else "reject")
+                ranked.append((application, score, rec, 0.7, int(round(score))))
 
-        ranked.sort(key=lambda entry: (-entry[2], entry[0].applied_at))
+        ranked.sort(key=lambda entry: (-entry[1], entry[0].applied_at))
         top_entries = ranked[:max(1, limit)]
 
         candidates: list[TopCandidateItem] = []
-        for index, (application, analysis, score) in enumerate(top_entries, start=1):
+        for index, (application, score, rec, conf, overall_score) in enumerate(top_entries, start=1):
             job = application.job
             candidate = application.candidate
             candidates.append(
@@ -199,9 +211,9 @@ class CandidateRankingService:
                     job_id=application.job_id,
                     job_title=job.title if job else None,
                     application_id=application.id,
-                    recommendation=analysis.recommendation,
-                    confidence=analysis.confidence,
-                    overall_score=analysis.overall_score,
+                    recommendation=rec,
+                    confidence=conf,
+                    overall_score=overall_score,
                 ),
             )
 

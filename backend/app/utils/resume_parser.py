@@ -59,6 +59,8 @@ class ResumeParser:
             return self._extract_text_from_pdf(path)
         if suffix in {".docx", ".doc"}:
             return self._extract_text_from_docx(path)
+        if suffix in {".txt", ".text"}:
+            return path.read_text(encoding="utf-8", errors="ignore")
 
         raise ValueError(f"Unsupported resume format: {suffix}")
 

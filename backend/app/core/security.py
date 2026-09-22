@@ -6,9 +6,25 @@ from fastapi import HTTPException, Request, Response, status
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from app.core.config import settings
 from app.core.exceptions import AppException
+import bcrypt
 from passlib.context import CryptContext
 
+# Compatibility patch for passlib with bcrypt >= 4.0.0
+if not hasattr(bcrypt, "__about__"):
+    bcrypt.__about__ = type("about", (), {"__version__": getattr(bcrypt, "__version__", "4.0.0")})
+_orig_bcrypt_hashpw = bcrypt.hashpw
+
+
+def _patched_bcrypt_hashpw(password, salt):
+    if isinstance(password, (bytes, bytearray)) and len(password) > 72:
+        password = password[:72]
+    return _orig_bcrypt_hashpw(password, salt)
+
+
+bcrypt.hashpw = _patched_bcrypt_hashpw
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 
 def hash_password(password: str) -> str:

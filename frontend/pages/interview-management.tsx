@@ -19,7 +19,7 @@ import {
 } from "../components";
 import type { InterviewRecord, InterviewStatus } from "../components/ApplicationInterviewPanel";
 
-const INTERVIEWS_ENDPOINT = "/interviews";
+const INTERVIEWS_ENDPOINT = "/api/v1/interviews";
 
 function formatDateTime(value?: string): string {
   if (!value) return "—";
@@ -50,7 +50,10 @@ export default function InterviewManagementPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await authFetch(INTERVIEWS_ENDPOINT, { headers: { Accept: "application/json" } });
+      let response = await authFetch(INTERVIEWS_ENDPOINT, { headers: { Accept: "application/json" } });
+      if (!response.ok && response.status === 404) {
+        response = await authFetch("/interviews", { headers: { Accept: "application/json" } });
+      }
       if (!response.ok) {
         throw new Error(`Failed to load interviews (${response.status})`);
       }
@@ -151,6 +154,7 @@ export default function InterviewManagementPage() {
                   { key: "type", header: "Type" },
                   { key: "schedule", header: "Schedule" },
                   { key: "interviewer", header: "Interviewer" },
+                  { key: "score", header: "AI Score" },
                   { key: "status", header: "Status" },
                   { key: "actions", header: "Actions" },
                 ]}
@@ -160,7 +164,17 @@ export default function InterviewManagementPage() {
                   job: interview.application?.job_title ?? "—",
                   type: formatStatus(interview.interview_type),
                   schedule: `${formatDateTime(interview.scheduled_start)} (${interview.timezone})`,
-                  interviewer: interview.interviewer?.full_name ?? "—",
+                  interviewer:
+                    interview.interviewer?.full_name ??
+                    (interview.interview_type === "ai_screening" ? "AI Copilot" : "—"),
+                  score:
+                    interview.interview_score != null ? (
+                      <Badge tone={interview.interview_score >= 60 ? "success" : "warning"}>
+                        {interview.interview_score}%
+                      </Badge>
+                    ) : (
+                      "—"
+                    ),
                   status: (
                     <Badge tone={statusTone(interview.status)}>{formatStatus(interview.status)}</Badge>
                   ),
@@ -220,12 +234,53 @@ export default function InterviewManagementPage() {
                   <p className="job-application-card-meta">
                     {formatStatus(aiPanelInterview.interview_type)} ·{" "}
                     {formatDateTime(aiPanelInterview.scheduled_start)}
+                    {aiPanelInterview.interview_score != null
+                      ? ` · Score: ${aiPanelInterview.interview_score}%`
+                      : ""}
                   </p>
                   <InterviewAIAnalysisPanel
                     interviewId={aiPanelInterview.id}
                     interviewStatus={aiPanelInterview.status}
                     applicationStatus={aiPanelInterview.application?.status}
                   />
+                  {Array.isArray(aiPanelInterview.questions_json) &&
+                  aiPanelInterview.questions_json.length > 0 &&
+                  aiPanelInterview.answers_json ? (
+                    <div style={{ marginTop: "1rem" }}>
+                      <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "0.75rem" }}>
+                        Interview Q&A Transcript
+                      </h3>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                        {aiPanelInterview.questions_json.map((q: any, idx: number) => {
+                          const answer = aiPanelInterview.answers_json?.[q.id] || "No answer provided.";
+                          return (
+                            <div
+                              key={q.id || idx}
+                              style={{
+                                border: "1px solid var(--color-border, #e2e8f0)",
+                                borderRadius: "6px",
+                                padding: "0.75rem",
+                                background: "var(--color-bg-subtle, #f8fafc)",
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
+                                <strong>
+                                  Q{idx + 1} ({q.category || "General"} · {q.competency || "Core"}):
+                                </strong>
+                              </div>
+                              <p style={{ margin: "0.25rem 0", color: "var(--color-text, #0f172a)" }}>
+                                {q.question}
+                              </p>
+                              <div style={{ marginTop: "0.5rem", padding: "0.5rem", background: "#fff", borderRadius: "4px", border: "1px solid #e2e8f0" }}>
+                                <small style={{ fontWeight: 600, color: "#64748b" }}>Candidate Response:</small>
+                                <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.9rem" }}>{answer}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                 </Stack>
               </Section>
             ) : null}

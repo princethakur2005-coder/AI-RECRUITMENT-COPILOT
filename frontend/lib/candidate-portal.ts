@@ -22,6 +22,39 @@ export interface CandidateApplication {
   job_title: string | null;
   company_id: string;
   company_name: string | null;
+  assessment_score?: number | null;
+  interview_score?: number | null;
+}
+
+export interface CandidateAssessmentQuestion {
+  id: string;
+  question: string;
+  options: Record<string, string>;
+  difficulty?: string | null;
+  skill_tag?: string | null;
+}
+
+export interface CandidateAssessmentData {
+  session_id: string;
+  application_id: string;
+  job_title?: string | null;
+  status: string;
+  total_questions: number;
+  score?: number | null;
+  questions: CandidateAssessmentQuestion[];
+  completed_at?: string | null;
+}
+
+export interface AssessmentSubmitResult {
+  session_id: string;
+  application_id: string;
+  status: string;
+  score: number;
+  total_questions: number;
+  correct_count: number;
+  passed: boolean;
+  breakdown?: Record<string, any>;
+  completed_at: string;
 }
 
 export interface CandidateInterview {
@@ -58,10 +91,49 @@ export interface CandidateOffer {
 
 export type PortalTab = "dashboard" | "applications" | "interviews" | "offers" | "profile";
 
+export interface CandidateAIInterviewQuestion {
+  id: string;
+  question: string;
+  category: string;
+  competency: string;
+  difficulty?: string | null;
+  context?: string | null;
+}
+
+export interface CandidateAIInterviewData {
+  id: string;
+  application_id: string;
+  job_id: string;
+  job_title: string;
+  company_name: string;
+  status: string;
+  score?: number | null;
+  questions: CandidateAIInterviewQuestion[];
+  evaluation?: Record<string, any> | null;
+  created_at: string;
+  completed_at?: string | null;
+}
+
+export interface CandidateAIInterviewSubmitResult {
+  interview_id?: string | null;
+  session_id: string;
+  score: number;
+  status: string;
+  overall_feedback: string;
+  recommendation: string;
+  key_strengths: string[];
+  growth_areas: string[];
+  question_evaluations?: any[];
+}
+
 export const CANDIDATE_PORTAL_API = {
   me: "/auth/candidate/me",
   applications: "/candidate/applications",
   application: (id: string) => `/candidate/applications/${id}`,
+  assessment: (applicationId: string) => `/candidate/applications/${applicationId}/assessment`,
+  submitAssessment: (applicationId: string) => `/candidate/applications/${applicationId}/assessment/submit`,
+  aiInterview: (applicationId: string) => `/candidate/applications/${applicationId}/interview`,
+  submitAIInterview: (applicationId: string) => `/candidate/applications/${applicationId}/interview/submit`,
   interviews: "/candidate/interviews",
   interview: (id: string) => `/candidate/interviews/${id}`,
   offers: "/candidate/offers",

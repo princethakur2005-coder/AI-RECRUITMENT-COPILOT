@@ -25,6 +25,7 @@ class CandidateApplicationResponse(BaseModel):
     job_title: str | None = None
     company_id: UUID
     company_name: str | None = None
+    assessment_score: float | None = None
 
 
 class CandidateInterviewResponse(BaseModel):

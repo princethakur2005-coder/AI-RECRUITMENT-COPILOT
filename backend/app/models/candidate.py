@@ -145,3 +145,184 @@ class Candidate(Base):
 
         events.sort(key=lambda item: item["occurred_at"])
         return events
+
+    @property
+    def latest_application(self) -> Application | None:
+        apps = self.applications or []
+        if not apps:
+            return None
+        return sorted(
+            apps,
+            key=lambda a: getattr(a, "applied_at", None) or getattr(a, "created_at", None) or self.created_at,
+            reverse=True,
+        )[0]
+
+    @property
+    def application_id(self) -> UUID | None:
+        app = self.latest_application
+        return app.id if app is not None else None
+
+    @property
+    def fit_score(self) -> float | None:
+        app = self.latest_application
+        if app is not None:
+            if app.fit_score is not None:
+                return round(float(app.fit_score), 1)
+            if app.ai_analysis is not None:
+                return round(float(app.ai_analysis.overall_score), 1)
+        return None
+
+    @property
+    def assessment_score(self) -> float | None:
+        app = self.latest_application
+        if app is not None and getattr(app, "assessment_score", None) is not None:
+            return round(float(app.assessment_score), 1)
+        return None
+
+    @property
+    def assessment_breakdown(self) -> dict[str, Any] | None:
+        app = self.latest_application
+        if app is not None:
+            sessions = getattr(app, "assessment_sessions", None) or []
+            completed = [s for s in sessions if getattr(s, "status", None) == "completed"]
+            if completed:
+                return completed[-1].breakdown_json
+            if sessions and sessions[-1].breakdown_json:
+                return sessions[-1].breakdown_json
+
+            # Fallback to DB session lookup if in-memory relationship was not refreshed
+            from sqlalchemy.orm import object_session
+            sess = object_session(app) or object_session(self)
+            if sess is not None:
+                from app.models.assessment import AssessmentSession
+                latest = (
+                    sess.query(AssessmentSession)
+                    .filter(
+                        AssessmentSession.application_id == app.id,
+                        AssessmentSession.status == "completed",
+                    )
+                    .order_by(AssessmentSession.created_at.desc())
+                    .first()
+                )
+                if latest and latest.breakdown_json:
+                    return latest.breakdown_json
+        return None
+
+    @property
+    def interview_score(self) -> float | None:
+        app = self.latest_application
+        if app is not None and getattr(app, "interview_score", None) is not None:
+            return round(float(app.interview_score), 1)
+        return None
+
+    @property
+    def interview_feedback(self) -> dict[str, Any] | None:
+        app = self.latest_application
+        if app is not None:
+            sessions = getattr(app, "interview_sessions", None) or []
+            completed = [s for s in sessions if getattr(s, "status", None) == "completed"]
+            if completed and completed[-1].evaluation_json:
+                return completed[-1].evaluation_json
+            if sessions and sessions[-1].evaluation_json:
+                return sessions[-1].evaluation_json
+
+            interviews = getattr(app, "interviews", None) or []
+            for itv in reversed(interviews):
+                if getattr(itv, "evaluation_json", None):
+                    return itv.evaluation_json
+
+            from sqlalchemy.orm import object_session
+            sess = object_session(app) or object_session(self)
+            if sess is not None:
+                from app.models.interview import InterviewSession
+                latest = (
+                    sess.query(InterviewSession)
+                    .filter(
+                        InterviewSession.application_id == app.id,
+                        InterviewSession.status == "completed",
+                    )
+                    .order_by(InterviewSession.created_at.desc())
+                    .first()
+                )
+                if latest and latest.evaluation_json:
+                    return latest.evaluation_json
+        return None
+    @property
+    def composite_score(self) -> float | None:
+        app = self.latest_application
+        if app is not None and getattr(app, "composite_score", None) is not None:
+            return round(float(app.composite_score), 1)
+        return None
+
+    @property
+    def hiring_decision(self) -> dict[str, Any] | None:
+        app = self.latest_application
+        if app is not None and getattr(app, "hiring_decision_json", None) is not None:
+            return app.hiring_decision_json
+        return None
+
+    @property
+    def final_recommendation(self) -> str | None:
+        dec = self.hiring_decision
+        if dec and isinstance(dec, dict):
+            return dec.get("recommendation")
+        return None
+
+    @property
+    def evaluation_summary(self) -> str | None:
+        app = self.latest_application
+        if app is not None:
+            if app.evaluation_summary:
+                return app.evaluation_summary
+            if app.ai_analysis is not None and app.ai_analysis.summary:
+                return app.ai_analysis.summary
+        return None
+
+    @property
+    def ai_evaluation_summary(self) -> str | None:
+        return self.evaluation_summary
+
+    @property
+    def recommendation_summary(self) -> str | None:
+        app = self.latest_application
+        if app is not None and app.ai_analysis is not None:
+            return app.ai_analysis.recommendation
+        return None
+
+    @property
+    def hiring_recommendation_summary(self) -> str | None:
+        return self.recommendation_summary
+
+    @property
+    def matched_skills(self) -> list[str]:
+        app = self.latest_application
+        if app is not None and app.ai_analysis is not None and app.ai_analysis.matched_skills:
+            return list(app.ai_analysis.matched_skills)
+        return []
+
+    @property
+    def missing_skills(self) -> list[str]:
+        app = self.latest_application
+        if app is not None and app.ai_analysis is not None and app.ai_analysis.missing_skills:
+            return list(app.ai_analysis.missing_skills)
+        return []
+
+    @property
+    def resume_preview_url(self) -> str | None:
+        path = self.resume_path or (self.latest_application.resume_path if self.latest_application else None)
+        if path:
+            return f"/candidates/{self.id}/resume"
+        return None
+
+    @property
+    def resume_url(self) -> str | None:
+        return self.resume_preview_url
+
+    @property
+    def candidate_match_summary(self) -> str | None:
+        if self.fit_score is not None:
+            matched = self.matched_skills
+            skills_part = f" Matched skills: {', '.join(matched)}." if matched else ""
+            return f"Candidate match score: {int(self.fit_score)}%.{skills_part}"
+        return None
+

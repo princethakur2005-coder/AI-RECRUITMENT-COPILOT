@@ -1,90 +1,90 @@
 {
   "resume_summary": [
     {
-      "id": "45f9edd0-cbbe-40d1-abbf-58654476e281",
+      "id": "bc564240-8c70-45da-8bea-b1d520333676",
       "template": "You are an expert recruitment analyst. Provide a concise summary of the candidate resume focusing on skills, experience, achievements, and role fit.\nResume:\n{resume_text}\n\nReturn a summary in {max_tokens} tokens or fewer.",
       "description": "default",
-      "created_at": "2026-08-21T08:57:48Z",
+      "created_at": "2026-09-22T11:30:25Z",
       "active": true,
       "weight": 1.0
     }
   ],
   "skill_match": [
     {
-      "id": "6c7f2baf-f9cb-45ec-ad50-e0a525e7795b",
+      "id": "eff3ac33-20b3-457f-b195-770b70066bcd",
       "template": "Given the job requirements: {job_requirements}\nAnd the resume text: {resume_text}\nList matched skills, missing skills, and a short justification for each match.",
       "description": "default",
-      "created_at": "2026-08-21T08:57:48Z",
+      "created_at": "2026-09-22T11:30:25Z",
       "active": true,
       "weight": 1.0
     }
   ],
   "candidate_ranking": [
     {
-      "id": "ebe96aa1-2fb5-47f5-b1cb-4a78a5b515b0",
+      "id": "a9f31277-1235-4739-ae37-a3b022435423",
       "template": "Rank the following candidates for the role described by {job_description}.\nUse criteria: {criteria}. For each candidate provide a numeric score and a brief rationale.\nCandidates:\n{candidates}",
       "description": "default",
-      "created_at": "2026-08-21T08:57:48Z",
+      "created_at": "2026-09-22T11:30:25Z",
       "active": true,
       "weight": 1.0
     }
   ],
   "candidate_shortlist": [
     {
-      "id": "0a6ae50e-894a-4665-b551-f24f3069c9a8",
+      "id": "ba2fb30b-677d-4e2d-bdf1-96be173836f0",
       "template": "As a hiring copilot, review the top candidates below for the role described by {job_description}.\nUse the criteria: {criteria}. Provide a shortlist of the top {top_n} candidates with a short rationale for each.\nCandidates:\n{candidates}",
       "description": "default",
-      "created_at": "2026-08-21T08:57:48Z",
+      "created_at": "2026-09-22T11:30:25Z",
       "active": true,
       "weight": 1.0
     }
   ],
   "compare_candidates": [
     {
-      "id": "1d9f58c7-4eed-460f-93cb-853bdd80f6f5",
+      "id": "90f8f309-bc4b-4967-bd10-42c433ee5488",
       "template": "Compare these candidates for the role described by {job_description}.\nHighlight strengths, weaknesses, risks, and skill gaps for each candidate based on criteria: {criteria}.\nRecommend the best candidate and explain why they are the strongest fit.\nCandidates:\n{candidates}",
       "description": "default",
-      "created_at": "2026-08-21T08:57:48Z",
+      "created_at": "2026-09-22T11:30:25Z",
       "active": true,
       "weight": 1.0
     }
   ],
   "explain_decision": [
     {
-      "id": "d71dc785-0f80-4b5a-bd1e-b00fbac9aeb6",
+      "id": "ce62b909-34ce-4bef-ac39-cbddd9506f74",
       "template": "Explain this AI hiring decision in recruiter-friendly language.\nDecision context: {decision_context}\nDecision: {decision}\nInclude why the AI made the recommendation and what factors matter most.",
       "description": "default",
-      "created_at": "2026-08-21T08:57:48Z",
+      "created_at": "2026-09-22T11:30:25Z",
       "active": true,
       "weight": 1.0
     }
   ],
   "note_suggestion": [
     {
-      "id": "0c9f08c6-1343-4cac-85be-bba136c604c3",
+      "id": "272353f5-15a6-4bdb-959b-ff99a66b10a9",
       "template": "You are an AI recruitment assistant. Suggest a short recruiter note for {candidate_name}. Use the candidate summary and recruiter context to make it actionable. If there are mention targets, include them with @handle syntax.\nCandidate summary: {candidate_summary}\nRecruiter context: {recruiter_context}\nMentions: {mentions}\nReturn only the suggested note content.",
       "description": "default",
-      "created_at": "2026-08-21T08:57:48Z",
+      "created_at": "2026-09-22T11:30:25Z",
       "active": true,
       "weight": 1.0
     }
   ],
   "interview_questions": [
     {
-      "id": "70025a3b-7535-433c-b298-1ab7b4ffb4e3",
+      "id": "31c7724c-5230-4fcb-8fd5-9ff4ac0076d3",
       "template": "Generate {count} interview questions for the role: {role}. Focus on {focus}.",
       "description": "default",
-      "created_at": "2026-08-21T08:57:48Z",
+      "created_at": "2026-09-22T11:30:25Z",
       "active": true,
       "weight": 1.0
     }
   ],
   "short_bio": [
     {
-      "id": "90e4a637-5029-4a39-8ee6-4548b07b8048",
+      "id": "a6ad1058-5e88-4048-bdcf-0f2cf9c45c7b",
       "template": "Write a short professional bio for {name} that emphasizes {highlights}. Keep it under {max_tokens} tokens.",
       "description": "Create a short professional bio",
-      "created_at": "2026-08-21T08:57:48Z",
+      "created_at": "2026-09-22T11:30:25Z",
       "active": true,
       "weight": 1.0
     }

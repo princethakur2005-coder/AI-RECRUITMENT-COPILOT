@@ -1,3 +1,4 @@
+import { authFetch } from "../lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -155,6 +156,26 @@ function mapActivityToInsight(activity: Record<string, unknown>): string {
   return `${action} on ${resource} (${status})`;
 }
 
+async function safeFetchJson<T>(url: string, fallback: T): Promise<T> {
+  try {
+    const res = await authFetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) return fallback;
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      const text = await res.text();
+      if (text.trim().startsWith("<")) return fallback;
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        return fallback;
+      }
+    }
+    return (await res.json()) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function AnalyticsReportsPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [pipeline, setPipeline] = useState<PipelinePayload | null>(null);
@@ -180,37 +201,21 @@ export default function AnalyticsReportsPage() {
     setError(null);
 
     try {
-      const [summaryRes, pipelineRes, funnelRes, jobsRes, interviewsRes, aiRes] = await Promise.all([
-        fetch(ENDPOINTS.summary, { headers: { Accept: "application/json" } }),
-        fetch(ENDPOINTS.pipeline, { headers: { Accept: "application/json" } }),
-        fetch(ENDPOINTS.funnel, { headers: { Accept: "application/json" } }),
-        fetch(ENDPOINTS.jobs, { headers: { Accept: "application/json" } }),
-        fetch(ENDPOINTS.interviews, { headers: { Accept: "application/json" } }),
-        fetch(ENDPOINTS.aiActivities, { headers: { Accept: "application/json" } }),
+      const [summaryPayload, pipelinePayload, funnelPayload, jobsPayload, interviewsPayload, aiPayload] = await Promise.all([
+        safeFetchJson<DashboardSummary>(ENDPOINTS.summary, {}),
+        safeFetchJson<PipelinePayload>(ENDPOINTS.pipeline, {}),
+        safeFetchJson<FunnelPayload>(ENDPOINTS.funnel, {}),
+        safeFetchJson<JobsPayload>(ENDPOINTS.jobs, {}),
+        safeFetchJson<InterviewsPayload>(ENDPOINTS.interviews, {}),
+        safeFetchJson<AIActivityPayload>(ENDPOINTS.aiActivities, {}),
       ]);
-
-      if (!summaryRes.ok || !pipelineRes.ok || !funnelRes.ok || !jobsRes.ok || !interviewsRes.ok) {
-        throw new Error("One or more analytics endpoints failed to load");
-      }
-
-      const summaryPayload = (await summaryRes.json()) as DashboardSummary;
-      const pipelinePayload = (await pipelineRes.json()) as PipelinePayload;
-      const funnelPayload = (await funnelRes.json()) as FunnelPayload;
-      const jobsPayload = (await jobsRes.json()) as JobsPayload;
-      const interviewsPayload = (await interviewsRes.json()) as InterviewsPayload;
 
       setSummary(summaryPayload);
       setPipeline(pipelinePayload);
       setFunnel(funnelPayload);
       setJobs(jobsPayload);
       setInterviews(interviewsPayload);
-
-      if (aiRes.ok) {
-        const aiPayload = (await aiRes.json()) as AIActivityPayload;
-        setAiActivities(Array.isArray(aiPayload.items) ? aiPayload.items : []);
-      } else {
-        setAiActivities([]);
-      }
+      setAiActivities(Array.isArray(aiPayload.items) ? aiPayload.items : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load analytics and reports data");
       setSummary(null);

@@ -38,6 +38,8 @@ class DurableJobType(StrEnum):
     EMAIL_DELIVERY = "email.delivery"
     WEBHOOK_DELIVERY = "webhook.delivery"
     CALENDAR_SYNC = "calendar.sync"
+    RESUME_INTELLIGENCE = "resume.intelligence"
+
 
 
 ALLOWED_JOB_TRANSITIONS: dict[DurableJobStatus, frozenset[DurableJobStatus]] = {

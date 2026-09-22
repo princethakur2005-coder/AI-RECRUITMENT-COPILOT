@@ -40,6 +40,20 @@ class CandidateService(BaseService[Candidate]):
     def update(self, db_obj: Candidate, obj_in: dict[str, Any]) -> Candidate:
         before: Dict[str, Any] = {field: getattr(db_obj, field, None) for field in obj_in.keys()}
         updated = super().update(db_obj, obj_in)
+        if "status" in obj_in and updated.latest_application is not None:
+            try:
+                from datetime import datetime, timezone
+                app = updated.latest_application
+                status_val = str(obj_in["status"]).strip().lower()
+                if status_val == "offer":
+                    status_val = "offered"
+                app.status = status_val
+                app.updated_at = datetime.now(timezone.utc)
+                if hasattr(self.repository, "session") and self.repository.session is not None:
+                    self.repository.session.add(app)
+                    self.repository.session.commit()
+            except Exception:
+                pass
         audit_service.log(
             actor_id="system",
             actor_type="system",

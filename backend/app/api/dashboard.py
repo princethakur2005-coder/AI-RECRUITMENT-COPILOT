@@ -117,6 +117,23 @@ def get_dashboard_member_user(
     return user
 
 
+@router.get("/summary")
+@router.get("/summary/", include_in_schema=False)
+def get_dashboard_summary(
+    limit: int = Query(default=5, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    member = CompanyMemberRepository(db).get_by_user_id(current_user.id)
+    if not member or not member.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Active company membership required",
+        )
+    service = DashboardService(db=db)
+    return service.get_dashboard_summary(member.company_id, limit=limit)
+
+
 @router.get("", response_model=DashboardOverviewResponse)
 def recruiter_dashboard_overview(
     user: User = Depends(get_current_user),
@@ -280,49 +297,49 @@ def reporting_time_series(
         raise
 
 
-@router.get("/summary")
-def dashboard_summary(
-    user: User = Depends(get_dashboard_member_user),
-    service: DashboardService = Depends(get_dashboard_service),
-) -> dict:
-    _ = user
-    return service.get_dashboard()
+def _get_user_company_id(user: User, db: Session) -> UUID | None:
+    member = CompanyMemberRepository(db).get_by_user_id(user.id)
+    return member.company_id if member and member.is_active else None
 
 
 @router.get("/pipeline-metrics")
 def pipeline_metrics(
     user: User = Depends(get_dashboard_member_user),
+    db: Session = Depends(get_db),
     service: DashboardService = Depends(get_dashboard_service),
 ) -> dict:
-    _ = user
-    return service.get_pipeline_widget()
+    company_id = _get_user_company_id(user, db)
+    return service.get_pipeline_widget(company_id)
 
 
 @router.get("/funnel")
 def funnel_metrics(
     user: User = Depends(get_dashboard_member_user),
+    db: Session = Depends(get_db),
     service: DashboardService = Depends(get_dashboard_service),
 ) -> dict:
-    _ = user
-    return service.get_funnel_widget()
+    company_id = _get_user_company_id(user, db)
+    return service.get_funnel_widget(company_id)
 
 
 @router.get("/job-metrics")
 def job_statistics(
     user: User = Depends(get_dashboard_member_user),
+    db: Session = Depends(get_db),
     service: DashboardService = Depends(get_dashboard_service),
 ) -> dict:
-    _ = user
-    return service.get_job_statistics_widget()
+    company_id = _get_user_company_id(user, db)
+    return service.get_job_statistics_widget(company_id)
 
 
 @router.get("/interviews")
 def interview_metrics(
     user: User = Depends(get_dashboard_member_user),
+    db: Session = Depends(get_db),
     service: DashboardService = Depends(get_dashboard_service),
 ) -> dict:
-    _ = user
-    return service.get_interview_metrics_widget()
+    company_id = _get_user_company_id(user, db)
+    return service.get_interview_metrics_widget(company_id)
 
 
 @router.get("/activities")

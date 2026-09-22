@@ -78,14 +78,28 @@ export default function NotificationsPage() {
     setError(null);
 
     try {
-      const response = await authFetch(NOTIFICATIONS_ENDPOINT, {
+      let response = await authFetch(NOTIFICATIONS_ENDPOINT, {
         headers: {
           Accept: "application/json",
         },
       });
 
+      if (!response.ok && response.status === 404) {
+        response = await authFetch("/api/v1/notifications", {
+          headers: {
+            Accept: "application/json",
+          },
+        });
+      }
+
       if (!response.ok) {
         throw new Error(`Failed to load notifications (${response.status})`);
+      }
+
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        setNotifications([]);
+        return;
       }
 
       const payload = (await response.json()) as NotificationResponse | NotificationRecord[];

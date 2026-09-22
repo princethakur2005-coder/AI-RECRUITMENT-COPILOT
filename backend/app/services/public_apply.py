@@ -8,12 +8,16 @@ from sqlalchemy.orm import Session
 
 from app.core.application_source import APPLICATION_SOURCE_CAREERS_PAGE
 from app.core.application_status import DEFAULT_APPLICATION_STATUS
+from app.core.durable_job import DurableJobType
 from app.models.application import Application
 from app.models.candidate import Candidate
 from app.repositories.application import ApplicationRepository
 from app.repositories.candidate import CandidateRepository
+from app.repositories.durable_job import DurableJobRepository
 from app.repositories.job import JobRepository
-from app.schemas.public_apply import PublicApplyForm, PublicApplyResponse
+from app.schemas.durable_job import DurableJobSubmit
+from app.schemas.public_apply import PublicApplyForm, PublicApplyResponse, PublicJobDetailsResponse
+from app.services.durable_job_service import DurableJobService
 from app.services.reporting_cache import invalidate_company_reporting_cache
 from app.utils.resume_management import ResumeManager
 
@@ -32,12 +36,47 @@ class PublicApplyService:
         candidate_repository: CandidateRepository,
         application_repository: ApplicationRepository,
         resume_manager: ResumeManager | None = None,
+        durable_job_service: DurableJobService | None = None,
     ) -> None:
         self.db = db
         self.job_repository = job_repository
         self.candidate_repository = candidate_repository
         self.application_repository = application_repository
         self.resume_manager = resume_manager or ResumeManager()
+        self.durable_job_service = durable_job_service or DurableJobService(DurableJobRepository(db))
+
+
+    def get_public_job(self, job_id: UUID) -> PublicJobDetailsResponse:
+        job = self.job_repository.get_job_for_public_apply(job_id)
+        if not job:
+            raise LookupError("Job not found or is not open for applications")
+
+        requirements: list[str] = []
+        if isinstance(job.job_intelligence, dict):
+            reqs = (
+                job.job_intelligence.get("required_skills")
+                or job.job_intelligence.get("requirements")
+                or []
+            )
+            if isinstance(reqs, list):
+                requirements = [str(r) for r in reqs if str(r).strip()]
+
+        company_name = None
+        if getattr(job, "company", None) is not None:
+            company_name = job.company.name
+
+        return PublicJobDetailsResponse(
+            id=job.id,
+            title=job.title,
+            department=job.department,
+            location=job.location,
+            employment_type=job.employment_type,
+            experience_level=job.experience_level,
+            description=job.description,
+            requirements=requirements,
+            company_name=company_name,
+            status=job.status,
+        )
 
     def submit_application(
         self,
@@ -45,6 +84,10 @@ class PublicApplyService:
         form: PublicApplyForm,
         resume_file: UploadFile,
     ) -> PublicApplyResponse:
+        filename = (resume_file.filename or "").lower()
+        if not (filename.endswith(".pdf") or filename.endswith(".docx")):
+            raise ValueError("Only PDF and DOCX resume files are supported")
+
         job = self.job_repository.get_job_for_public_apply(job_id)
         if not job:
             raise LookupError("Job not found or is not open for applications")
@@ -69,6 +112,23 @@ class PublicApplyService:
             if resume_path:
                 self.resume_manager.delete_resume(resume_path)
             raise
+
+        # Enqueue asynchronous AI resume intelligence processing
+        self.durable_job_service.submit(
+            DurableJobSubmit(
+                job_type=DurableJobType.RESUME_INTELLIGENCE,
+                payload={
+                    "application_id": str(application.id),
+                    "candidate_id": str(application.candidate_id),
+                    "job_id": str(application.job_id),
+                    "company_id": str(application.company_id),
+                    "resume_path": resume_path,
+                },
+                idempotency_key=f"resume_intelligence:{application.id}",
+                correlation_id=f"public_apply:{application.id}",
+                company_id=application.company_id,
+            )
+        )
 
         return PublicApplyResponse(
             application_id=application.id,
@@ -99,6 +159,7 @@ class PublicApplyService:
                     email=email,
                     phone=form.phone,
                     resume_path=resume_path,
+                    job_id=job_id,
                     status="new",
                     is_active=True,
                 )
@@ -110,6 +171,8 @@ class PublicApplyService:
                 if form.phone:
                     candidate.phone = form.phone
                 candidate.resume_path = resume_path
+                if not candidate.job_id:
+                    candidate.job_id = job_id
                 self.db.add(candidate)
 
             self.db.flush()

@@ -50,6 +50,20 @@ interface CandidateRecord {
   evaluation_summary?: string;
   hiring_recommendation_summary?: string;
   recommendation_summary?: string;
+  candidate_match_summary?: string;
+  match_summary?: string;
+  fit_score?: number | null;
+  assessment_score?: number | null;
+  assessment_breakdown?: Record<string, any> | null;
+  interview_score?: number | null;
+  interview_feedback?: Record<string, any> | null;
+  composite_score?: number | null;
+  final_recommendation?: string | null;
+  hiring_decision?: Record<string, any> | null;
+  application_id?: string | null;
+  skills?: string | null;
+  matched_skills?: string[];
+  missing_skills?: string[];
   [key: string]: unknown;
 }
 
@@ -71,9 +85,11 @@ const STATUS_OPTIONS: Array<{ value: CandidateStatus; label: string }> = [
   { value: "new", label: "New" },
   { value: "screening", label: "Screening" },
   { value: "interview", label: "Interview" },
+  { value: "decision_ready", label: "Decision Ready" },
   { value: "decision_pending", label: "Decision Pending" },
-  { value: "offer", label: "Offer" },
   { value: "offer_pending", label: "Offer Pending" },
+  { value: "offered", label: "Offered" },
+  { value: "offer", label: "Offer" },
   { value: "hired", label: "Hired" },
   { value: "rejected", label: "Rejected" },
 ];
@@ -106,7 +122,12 @@ function extractResumeUrl(candidate: CandidateRecord | null): string | null {
 
   const metadata = (candidate.metadata as Record<string, unknown> | undefined) ?? {};
   const fallback = metadata.resume_url ?? metadata.resume_preview_url ?? metadata.resume_link;
-  return typeof fallback === "string" ? fallback : null;
+  if (typeof fallback === "string") return fallback;
+
+  if (candidate.id && (candidate.resume_path || candidate.resume_preview_url || candidate.resume_url)) {
+    return `/candidates/${candidate.id}/resume`;
+  }
+  return null;
 }
 
 function extractEvaluationSummary(candidate: CandidateRecord | null): string {
@@ -135,6 +156,45 @@ function extractRecommendationSummary(candidate: CandidateRecord | null): string
   return typeof summary === "string" ? summary : "";
 }
 
+function extractMatchSummary(candidate: CandidateRecord | null): string {
+  if (!candidate) return "";
+
+  const direct =
+    (candidate.candidate_match_summary as string | undefined) ??
+    (candidate.match_summary as string | undefined);
+  if (direct) return direct;
+
+  const payload = (candidate.evaluation_intelligence as Record<string, unknown> | undefined) ?? {};
+  const summary = payload.match_summary ?? payload.candidate_match_summary;
+  if (typeof summary === "string") return summary;
+
+  if (candidate.fit_score != null) {
+    const matched = Array.isArray(candidate.matched_skills) ? candidate.matched_skills : [];
+    const skillsPart = matched.length > 0 ? ` Matched skills: ${matched.join(", ")}.` : "";
+    return `Candidate match score: ${candidate.fit_score}%.${skillsPart}`;
+  }
+  return "";
+}
+
+function extractCandidateSkills(candidate: CandidateRecord | null): string[] {
+  if (!candidate) return [];
+  if (Array.isArray(candidate.matched_skills) && candidate.matched_skills.length > 0) {
+    return candidate.matched_skills;
+  }
+  if (typeof candidate.skills === "string" && candidate.skills.trim()) {
+    return candidate.skills.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function fitScoreTone(score?: number | null): "success" | "brand" | "warning" | "danger" | "neutral" {
+  if (score == null) return "neutral";
+  if (score >= 80) return "success";
+  if (score >= 65) return "brand";
+  if (score >= 50) return "warning";
+  return "danger";
+}
+
 function toTimelineItems(events: TimelineEvent[]): TimelineItem[] {
   return events.map((event, index) => ({
     id: String(event.id ?? `${event.action ?? "event"}-${index}`),
@@ -152,7 +212,7 @@ export default function CandidateManagementPage() {
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<"name" | "updated" | "status">("updated");
+  const [sortBy, setSortBy] = useState<"name" | "updated" | "status" | "composite">("updated");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const [page, setPage] = useState(1);
@@ -202,8 +262,8 @@ export default function CandidateManagementPage() {
 
     try {
       const [candidateRes, timelineRes] = await Promise.all([
-        fetch(`${CANDIDATES_ENDPOINT}/${candidateId}`, { headers: { Accept: "application/json" } }),
-        fetch(`${CANDIDATES_ENDPOINT}/${candidateId}/timeline?limit=20`, { headers: { Accept: "application/json" } }),
+        authFetch(`${CANDIDATES_ENDPOINT}/${candidateId}`, { headers: { Accept: "application/json" } }),
+        authFetch(`${CANDIDATES_ENDPOINT}/${candidateId}/timeline?limit=20`, { headers: { Accept: "application/json" } }),
       ]);
 
       if (!candidateRes.ok) {
@@ -259,6 +319,12 @@ export default function CandidateManagementPage() {
     const sorted = [...filtered].sort((a, b) => {
       const direction = sortOrder === "asc" ? 1 : -1;
 
+      if (sortBy === "composite") {
+        const scoreA = a.composite_score ?? a.fit_score ?? -1;
+        const scoreB = b.composite_score ?? b.fit_score ?? -1;
+        return (scoreA - scoreB) * direction;
+      }
+
       if (sortBy === "name") {
         return String(a.full_name ?? "").localeCompare(String(b.full_name ?? "")) * direction;
       }
@@ -294,6 +360,8 @@ export default function CandidateManagementPage() {
   const resumePreviewUrl = extractResumeUrl(detailCandidate);
   const evaluationSummary = extractEvaluationSummary(detailCandidate);
   const recommendationSummary = extractRecommendationSummary(detailCandidate);
+  const matchSummary = extractMatchSummary(detailCandidate);
+  const candidateSkills = extractCandidateSkills(detailCandidate);
 
   const togglePageSelection = (checked: boolean) => {
     if (checked) {
@@ -314,7 +382,7 @@ export default function CandidateManagementPage() {
     });
   };
 
-  const updateCandidateStatus = async (candidateId: string, status: CandidateStatus) => {
+  const updateCandidateStatus = async (candidateId: string, status: CandidateStatus, applicationId?: string | null) => {
     await authFetch(`${CANDIDATES_ENDPOINT}/${candidateId}`, {
       method: "PUT",
       headers: {
@@ -323,6 +391,41 @@ export default function CandidateManagementPage() {
       },
       body: JSON.stringify({ status }),
     });
+
+    const appId = applicationId || detailCandidate?.application_id;
+    if (appId) {
+      let appStatus = status;
+      if (appStatus === "offer") appStatus = "offered";
+      try {
+        await authFetch(`/api/v1/applications/${appId}/status`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ status: appStatus }),
+        });
+      } catch {
+        try {
+          await authFetch(`/applications/${appId}/status`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({ status: appStatus }),
+          });
+        } catch {}
+      }
+    }
+  };
+
+  const handleQuickStatusTransition = async (status: CandidateStatus) => {
+    if (!detailCandidate?.id) return;
+    setPendingStatus(status);
+    await updateCandidateStatus(detailCandidate.id, status, detailCandidate.application_id);
+    await loadCandidates();
+    await loadCandidateDetail(detailCandidate.id);
   };
 
   const handleApplyBulkStatus = async () => {
@@ -356,7 +459,7 @@ export default function CandidateManagementPage() {
 
   const handleUpdateDetailStatus = async () => {
     if (!detailCandidate?.id) return;
-    await updateCandidateStatus(detailCandidate.id, pendingStatus);
+    await updateCandidateStatus(detailCandidate.id, pendingStatus, detailCandidate.application_id);
     await loadCandidates();
     await loadCandidateDetail(detailCandidate.id);
   };
@@ -414,6 +517,8 @@ export default function CandidateManagementPage() {
                     setSortOrder(nextSortOrder);
                   }}
                   options={[
+                    { value: "composite:desc", label: "Composite Score (High to Low)" },
+                    { value: "composite:asc", label: "Composite Score (Low to High)" },
                     { value: "updated:desc", label: "Updated (Newest)" },
                     { value: "updated:asc", label: "Updated (Oldest)" },
                     { value: "name:asc", label: "Name (A-Z)" },
@@ -500,6 +605,25 @@ export default function CandidateManagementPage() {
                       render: (row: CandidateRecord) => <Badge tone={statusTone(row.status)}>{row.status ?? "unknown"}</Badge>,
                     },
                     {
+                      key: "composite_score",
+                      header: "Composite / AI Rank",
+                      render: (row: CandidateRecord) => {
+                        const score = row.composite_score ?? row.fit_score;
+                        const rec = row.final_recommendation ?? (row.hiring_decision as any)?.recommendation;
+                        if (score == null) return <span style={{ color: "var(--color-text-muted)" }}>—</span>;
+                        return (
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
+                            <Badge tone={fitScoreTone(score)}>{score}%</Badge>
+                            {rec ? (
+                              <Badge tone={rec === "strong_hire" || rec === "hire" ? "success" : rec === "review" ? "warning" : "danger"}>
+                                {String(rec).replaceAll("_", " ")}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        );
+                      },
+                    },
+                    {
                       key: "updated_at",
                       header: "Updated",
                       render: (row: CandidateRecord) => formatDate(row.updated_at ?? row.created_at),
@@ -539,9 +663,17 @@ export default function CandidateManagementPage() {
                             onChange={(event) => setPendingStatus(event.target.value)}
                             options={STATUS_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
                           />
-                          <Button size="sm" onClick={() => void handleUpdateDetailStatus()}>
-                            Save Status
-                          </Button>
+                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
+                            <Button size="sm" onClick={() => void handleUpdateDetailStatus()}>
+                              Save Status
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={() => void handleQuickStatusTransition("offered")}>
+                              Extend Offer
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={() => void handleQuickStatusTransition("hired")}>
+                              Mark Hired
+                            </Button>
+                          </div>
                         </Stack>
                       </Section>
 
@@ -550,10 +682,65 @@ export default function CandidateManagementPage() {
                           <small className="candidate-management-subtitle">Candidate Meta</small>
                           <p className="candidate-management-subtitle">Email: {detailCandidate.email ?? "-"}</p>
                           <p className="candidate-management-subtitle">Job ID: {detailCandidate.job_id ?? "-"}</p>
+                          {detailCandidate.fit_score != null ? (
+                            <p className="candidate-management-subtitle">
+                              AI Fit Score:{" "}
+                              <Badge tone={fitScoreTone(detailCandidate.fit_score)}>
+                                {detailCandidate.fit_score}%
+                              </Badge>
+                            </p>
+                          ) : null}
+                          {detailCandidate.assessment_score != null ? (
+                            <p className="candidate-management-subtitle">
+                              Assessment Score:{" "}
+                              <Badge tone={detailCandidate.assessment_score >= 60 ? "success" : "warning"}>
+                                {detailCandidate.assessment_score}%
+                              </Badge>
+                            </p>
+                          ) : null}
+                          {detailCandidate.interview_score != null ? (
+                            <p className="candidate-management-subtitle">
+                              Interview Score:{" "}
+                              <Badge tone={detailCandidate.interview_score >= 60 ? "success" : "warning"}>
+                                {detailCandidate.interview_score}%
+                              </Badge>
+                            </p>
+                          ) : null}
+                          {detailCandidate.composite_score != null ? (
+                            <p className="candidate-management-subtitle">
+                              Composite Score:{" "}
+                              <Badge tone={fitScoreTone(detailCandidate.composite_score)}>
+                                {detailCandidate.composite_score}%
+                              </Badge>
+                            </p>
+                          ) : null}
+                          {detailCandidate.final_recommendation || (detailCandidate.hiring_decision as any)?.recommendation ? (
+                            <p className="candidate-management-subtitle">
+                              Final Recommendation:{" "}
+                              <Badge tone={(detailCandidate.final_recommendation || (detailCandidate.hiring_decision as any)?.recommendation) === "strong_hire" || (detailCandidate.final_recommendation || (detailCandidate.hiring_decision as any)?.recommendation) === "hire" ? "success" : (detailCandidate.final_recommendation || (detailCandidate.hiring_decision as any)?.recommendation) === "review" ? "warning" : "danger"}>
+                                {String(detailCandidate.final_recommendation || (detailCandidate.hiring_decision as any)?.recommendation).toUpperCase().replaceAll("_", " ")}
+                              </Badge>
+                            </p>
+                          ) : null}
                           <p className="candidate-management-subtitle">Updated: {formatDate(detailCandidate.updated_at ?? detailCandidate.created_at)}</p>
                         </Stack>
                       </Section>
                     </div>
+
+                    {candidateSkills.length > 0 ? (
+                      <Section>
+                        <Stack gap="2">
+                          <strong>Extracted Skills & Competencies</strong>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                            {candidateSkills.map((skill, index) => (
+                              <Badge key={`${skill}-${index}`} tone="neutral">
+                                {skill}
+                              </Badge>
+                            ))}
+                          </div>
+                        </Stack>
+                      </Section>
+                    ) : null}
 
                     <Section>
                       <Stack gap="2">
@@ -577,6 +764,208 @@ export default function CandidateManagementPage() {
                           <Alert tone="info" description={evaluationSummary} />
                         ) : (
                           <EmptyState title="No evaluation summary" description="AI evaluation summary is unavailable for this candidate." />
+                        )}
+                      </Stack>
+                    </Section>
+
+                    <Section>
+                      <Stack gap="2">
+                        <strong>Role-Based AI Assessment & Auto-Scoring</strong>
+                        {detailCandidate.assessment_score != null ? (
+                          <Stack gap="2">
+                            <Alert
+                              tone={detailCandidate.assessment_score >= 60 ? "success" : "warning"}
+                              title={`Assessment Score: ${detailCandidate.assessment_score}% (${detailCandidate.assessment_score >= 60 ? "Passed" : "Needs Review"})`}
+                              description={
+                                detailCandidate.assessment_breakdown
+                                  ? `Answered ${detailCandidate.assessment_breakdown.correct_count ?? 0} of ${detailCandidate.assessment_breakdown.total_questions ?? 0} questions correctly.`
+                                  : `Overall assessment score: ${detailCandidate.assessment_score}%.`
+                              }
+                            />
+                            {Array.isArray(detailCandidate.assessment_breakdown?.details) && detailCandidate.assessment_breakdown.details.length > 0 ? (
+                              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                                {detailCandidate.assessment_breakdown.details.map((q: any, idx: number) => (
+                                  <div
+                                    key={q.question_id || idx}
+                                    style={{
+                                      border: "1px solid var(--color-border, #e2e8f0)",
+                                      borderRadius: "6px",
+                                      padding: "0.75rem",
+                                      background: q.is_correct ? "rgba(16, 185, 129, 0.05)" : "rgba(239, 68, 68, 0.05)",
+                                    }}
+                                  >
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
+                                      <strong>Q{idx + 1}: {q.question}</strong>
+                                      <Badge tone={q.is_correct ? "success" : "danger"}>
+                                        {q.is_correct ? "Correct" : "Incorrect"}
+                                      </Badge>
+                                    </div>
+                                    <small style={{ color: "var(--color-text-secondary, #64748b)" }}>
+                                      Selected: <strong>{q.selected_option || "None"}</strong> | Correct: <strong>{q.correct_option}</strong>
+                                    </small>
+                                    {q.explanation ? (
+                                      <p style={{ marginTop: "0.25rem", fontSize: "0.85rem" }}>
+                                        {q.explanation}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </Stack>
+                        ) : (
+                          <EmptyState
+                            title="No assessment completed"
+                            description="Candidate has not yet completed the role-based pre-screening assessment."
+                          />
+                        )}
+                      </Stack>
+                    </Section>
+
+                    <Section>
+                      <Stack gap="2">
+                        <strong>Role-Based AI Interview & Evaluation</strong>
+                        {detailCandidate.interview_score != null ? (
+                          <Stack gap="3">
+                            <Alert
+                              tone={detailCandidate.interview_score >= 70 ? "success" : detailCandidate.interview_score >= 50 ? "warning" : "danger"}
+                              title={`Interview Score: ${detailCandidate.interview_score}% — Recommendation: ${String(detailCandidate.interview_feedback?.recommendation ?? "evaluated").toUpperCase().replaceAll("_", " ")}`}
+                              description={
+                                (detailCandidate.interview_feedback?.overall_feedback as string | undefined) ||
+                                `AI-evaluated interview completed with score ${detailCandidate.interview_score}%.`
+                              }
+                            />
+
+                            {Array.isArray(detailCandidate.interview_feedback?.key_strengths) &&
+                            detailCandidate.interview_feedback.key_strengths.length > 0 ? (
+                              <div>
+                                <small style={{ fontWeight: 600, color: "var(--color-text-secondary, #64748b)" }}>
+                                  Observed Strengths:
+                                </small>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.25rem" }}>
+                                  {detailCandidate.interview_feedback.key_strengths.map((s: string, idx: number) => (
+                                    <Badge key={idx} tone="success">
+                                      {s}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {Array.isArray(detailCandidate.interview_feedback?.growth_areas) &&
+                            detailCandidate.interview_feedback.growth_areas.length > 0 ? (
+                              <div>
+                                <small style={{ fontWeight: 600, color: "var(--color-text-secondary, #64748b)" }}>
+                                  Growth Areas / Recommendations:
+                                </small>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.25rem" }}>
+                                  {detailCandidate.interview_feedback.growth_areas.map((g: string, idx: number) => (
+                                    <Badge key={idx} tone="warning">
+                                      {g}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {Array.isArray(detailCandidate.interview_feedback?.question_evaluations) &&
+                            detailCandidate.interview_feedback.question_evaluations.length > 0 ? (
+                              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "0.5rem" }}>
+                                <small style={{ fontWeight: 600, color: "var(--color-text-secondary, #64748b)" }}>
+                                  Interview Q&A Breakdown:
+                                </small>
+                                {detailCandidate.interview_feedback.question_evaluations.map((qe: any, idx: number) => (
+                                  <div
+                                    key={qe.question_id || idx}
+                                    style={{
+                                      border: "1px solid var(--color-border, #e2e8f0)",
+                                      borderRadius: "6px",
+                                      padding: "0.75rem",
+                                      background: "var(--color-bg-subtle, #f8fafc)",
+                                    }}
+                                  >
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
+                                      <strong>
+                                        Q{idx + 1}: {qe.question || qe.competency || "Question"}
+                                      </strong>
+                                      {qe.score != null ? (
+                                        <Badge tone={qe.score >= 60 ? "success" : "warning"}>
+                                          {qe.score}%
+                                        </Badge>
+                                      ) : null}
+                                    </div>
+                                    {qe.answer ? (
+                                      <div style={{ marginTop: "0.25rem", padding: "0.5rem", background: "#fff", borderRadius: "4px", border: "1px solid #e2e8f0" }}>
+                                        <small style={{ fontWeight: 600, color: "#64748b" }}>Candidate Answer:</small>
+                                        <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.85rem" }}>{qe.answer}</p>
+                                      </div>
+                                    ) : null}
+                                    {qe.feedback ? (
+                                      <p style={{ marginTop: "0.35rem", fontSize: "0.85rem", color: "#334155" }}>
+                                        {qe.feedback}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </Stack>
+                        ) : (
+                          <EmptyState
+                            title="No interview completed"
+                            description="Candidate has not yet completed the role-based AI interview."
+                          />
+                        )}
+                      </Stack>
+                    </Section>
+
+                    <Section>
+                      <Stack gap="2">
+                        <strong>Candidate Match Summary</strong>
+                        {matchSummary ? (
+                          <Alert tone="success" description={matchSummary} />
+                        ) : (
+                          <EmptyState
+                            title="No candidate match summary"
+                            description="Candidate match summary is not available for this candidate."
+                          />
+                        )}
+                      </Stack>
+                    </Section>
+
+                    <Section>
+                      <Stack gap="2">
+                        <strong>Final AI Hiring Decision & Composite Score</strong>
+                        {detailCandidate.composite_score != null ? (
+                          <Stack gap="3">
+                            <Alert
+                              tone={detailCandidate.composite_score >= 70 ? "success" : detailCandidate.composite_score >= 55 ? "warning" : "danger"}
+                              title={`Composite Score: ${detailCandidate.composite_score}% — Decision: ${String(detailCandidate.final_recommendation || (detailCandidate.hiring_decision as any)?.recommendation || "evaluated").toUpperCase().replaceAll("_", " ")}`}
+                              description={
+                                ((detailCandidate.hiring_decision as any)?.summary as string | undefined) ||
+                                `Composite hiring score computed from multi-stage recruitment pipeline (${detailCandidate.composite_score}%).`
+                              }
+                            />
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.75rem" }}>
+                              <div style={{ padding: "0.5rem", border: "1px solid var(--color-border, #e2e8f0)", borderRadius: "6px", textAlign: "center" }}>
+                                <small style={{ color: "var(--color-text-secondary, #64748b)" }}>Resume Fit (30%)</small>
+                                <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{detailCandidate.fit_score != null ? `${detailCandidate.fit_score}%` : "—"}</div>
+                              </div>
+                              <div style={{ padding: "0.5rem", border: "1px solid var(--color-border, #e2e8f0)", borderRadius: "6px", textAlign: "center" }}>
+                                <small style={{ color: "var(--color-text-secondary, #64748b)" }}>Assessment (35%)</small>
+                                <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{detailCandidate.assessment_score != null ? `${detailCandidate.assessment_score}%` : "—"}</div>
+                              </div>
+                              <div style={{ padding: "0.5rem", border: "1px solid var(--color-border, #e2e8f0)", borderRadius: "6px", textAlign: "center" }}>
+                                <small style={{ color: "var(--color-text-secondary, #64748b)" }}>Interview (35%)</small>
+                                <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{detailCandidate.interview_score != null ? `${detailCandidate.interview_score}%` : "—"}</div>
+                              </div>
+                            </div>
+                          </Stack>
+                        ) : (
+                          <EmptyState
+                            title="No composite score yet"
+                            description="Complete resume screening, assessment, and interview to generate the final composite decision."
+                          />
                         )}
                       </Stack>
                     </Section>

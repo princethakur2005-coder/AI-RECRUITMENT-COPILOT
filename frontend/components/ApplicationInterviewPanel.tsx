@@ -17,13 +17,13 @@ import {
 } from "./index";
 
 export type InterviewStatus = "scheduled" | "completed" | "cancelled" | "no_show";
-export type InterviewType = "phone" | "technical" | "hr" | "managerial" | "final";
+export type InterviewType = "phone" | "technical" | "hr" | "managerial" | "final" | "ai_screening" | string;
 
 export interface InterviewRecord {
   id: string;
   application_id: string;
   company_id: string;
-  interviewer_member_id: string;
+  interviewer_member_id?: string | null;
   interview_type: InterviewType;
   scheduled_start: string;
   scheduled_end: string;
@@ -32,6 +32,10 @@ export interface InterviewRecord {
   location?: string | null;
   notes?: string | null;
   status: InterviewStatus;
+  interview_score?: number | null;
+  questions_json?: any[] | null;
+  answers_json?: Record<string, any> | null;
+  evaluation_json?: Record<string, any> | null;
   created_at: string;
   updated_at: string;
   interviewer?: {

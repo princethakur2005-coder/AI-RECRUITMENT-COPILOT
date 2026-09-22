@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -36,6 +37,13 @@ class ApplicationResponse(BaseModel):
     candidate_id: UUID
     resume_path: str | None
     status: ApplicationStatus
+    fit_score: float | None = None
+    assessment_score: float | None = None
+    interview_score: float | None = None
+    composite_score: float | None = None
+    hiring_decision_json: dict[str, Any] | None = None
+    evaluation_summary: str | None = None
+    ai_status: str = "pending"
     source: str | None
     applied_at: datetime
     updated_at: datetime

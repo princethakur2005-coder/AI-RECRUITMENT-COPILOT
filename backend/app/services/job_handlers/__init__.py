@@ -10,6 +10,7 @@ from app.services.durable_job_service import DurableJobService
 from app.services.email_delivery import EmailDeliveryService
 from app.services.job_handlers.calendar_sync import CalendarSyncJobHandler
 from app.services.job_handlers.email_delivery import EmailDeliveryJobHandler
+from app.services.job_handlers.resume_intelligence import ResumeIntelligenceJobHandler
 from app.services.job_handlers.webhook_delivery import WebhookDeliveryJobHandler
 from app.services.webhook_delivery import WebhookDeliveryService
 
@@ -30,3 +31,8 @@ def register_default_job_handlers(
 
     calendar_handler = CalendarSyncJobHandler(db, fake_provider=fake_calendar_provider)
     service.register_handler(DurableJobType.CALENDAR_SYNC, calendar_handler.execute)
+
+    resume_handler = ResumeIntelligenceJobHandler(db)
+    service.register_handler(DurableJobType.RESUME_INTELLIGENCE, resume_handler.execute)
+    service.register_handler("process_resume_intelligence", resume_handler.execute)
+

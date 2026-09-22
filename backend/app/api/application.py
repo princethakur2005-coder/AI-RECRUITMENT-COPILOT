@@ -459,3 +459,27 @@ def get_application(
     except Exception as exc:
         _handle_service_errors(exc)
         raise
+
+
+@router.post("/{application_id}/hiring-decision")
+@router.get("/{application_id}/hiring-decision")
+def evaluate_or_get_hiring_decision(
+    application_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    member = CompanyMemberRepository(db).get_by_user_id(current_user.id)
+    if not member or not member.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Active company membership required",
+        )
+    from app.services.hiring_decision_service import HiringDecisionService
+    decision_service = HiringDecisionService(db)
+    app = decision_service.evaluate_final_hiring_decision(application_id, member.company_id)
+    return {
+        "application_id": str(app.id),
+        "composite_score": app.composite_score,
+        "hiring_decision": app.hiring_decision_json,
+        "status": app.status,
+    }

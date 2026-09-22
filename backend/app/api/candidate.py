@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -41,6 +44,34 @@ def get_candidate(
     if not candidate:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
     return candidate
+
+
+@router.get("/{candidate_id}/resume")
+def get_candidate_resume(
+    candidate_id: str,
+    service: CandidateService = Depends(get_candidate_service),
+) -> FileResponse:
+    candidate = service.get_by_id(candidate_id)
+    if not candidate:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
+
+    resume_path = candidate.resume_path or (
+        candidate.latest_application.resume_path if candidate.latest_application else None
+    )
+    if not resume_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found for candidate")
+
+    path = Path(resume_path)
+    if not path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume file not found on disk")
+
+    media_type = "application/pdf" if path.suffix.lower() == ".pdf" else "application/octet-stream"
+    return FileResponse(
+        path=path,
+        filename=path.name,
+        media_type=media_type,
+        headers={"Content-Disposition": f"inline; filename=\"{path.name}\""},
+    )
 
 
 @router.get("/{candidate_id}/timeline")

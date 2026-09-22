@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -65,7 +66,7 @@ class InterviewResponse(BaseModel):
     id: UUID
     application_id: UUID
     company_id: UUID
-    interviewer_member_id: UUID
+    interviewer_member_id: UUID | None = None
     interview_type: InterviewType
     scheduled_start: datetime
     scheduled_end: datetime
@@ -74,6 +75,10 @@ class InterviewResponse(BaseModel):
     location: str | None
     notes: str | None
     status: InterviewStatus
+    interview_score: float | None = None
+    questions_json: list[dict[str, Any]] | None = None
+    answers_json: dict[str, Any] | None = None
+    evaluation_json: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
     interviewer: InterviewInterviewerSummary | None = None

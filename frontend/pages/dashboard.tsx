@@ -292,6 +292,34 @@ export default function RecruiterDashboardPage() {
     [jobsByDepartmentRows],
   );
 
+  const handleCandidateAction = async (applicationId: string, newStatus: "offered" | "hired") => {
+    try {
+      await authFetch(`/api/v1/applications/${applicationId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      await loadDashboard();
+    } catch {
+      try {
+        await authFetch(`/applications/${applicationId}/status`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        await loadDashboard();
+      } catch (err) {
+        console.error("Failed to update candidate application status", err);
+      }
+    }
+  };
+
   return (
     <AppLayout
       className="recruiter-dashboard-page"
@@ -383,6 +411,28 @@ export default function RecruiterDashboardPage() {
                         { key: "job", header: "Job" },
                         { key: "score", header: "Rank Score", align: "right" },
                         { key: "recommendation", header: "Recommendation" },
+                        {
+                          key: "actions",
+                          header: "Actions",
+                          render: (row: Record<string, unknown>) => (
+                            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => void handleCandidateAction(String(row.id), "offered")}
+                              >
+                                Extend Offer
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => void handleCandidateAction(String(row.id), "hired")}
+                              >
+                                Hire
+                              </Button>
+                            </div>
+                          ),
+                        },
                       ]}
                       data={topCandidates.map((candidate) => ({
                         id: candidate.application_id,

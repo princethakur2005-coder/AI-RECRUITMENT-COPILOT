@@ -23,6 +23,10 @@ import {
 import {
   CANDIDATE_PORTAL_API as API,
   type CandidateApplication,
+  type CandidateAssessmentData,
+  type AssessmentSubmitResult,
+  type CandidateAIInterviewData,
+  type CandidateAIInterviewSubmitResult,
   type CandidateInterview,
   type CandidateMe,
   type CandidateOffer,
@@ -63,6 +67,18 @@ export default function CandidatePortalPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [submittingOfferId, setSubmittingOfferId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<"accept" | "decline" | null>(null);
+
+  const [assessmentData, setAssessmentData] = useState<CandidateAssessmentData | null>(null);
+  const [assessmentLoading, setAssessmentLoading] = useState(false);
+  const [assessmentSubmitting, setAssessmentSubmitting] = useState(false);
+  const [assessmentAnswers, setAssessmentAnswers] = useState<Record<string, string>>({});
+  const [assessmentResult, setAssessmentResult] = useState<AssessmentSubmitResult | null>(null);
+
+  const [aiInterviewData, setAiInterviewData] = useState<CandidateAIInterviewData | null>(null);
+  const [aiInterviewLoading, setAiInterviewLoading] = useState(false);
+  const [aiInterviewSubmitting, setAiInterviewSubmitting] = useState(false);
+  const [aiInterviewAnswers, setAiInterviewAnswers] = useState<Record<string, string>>({});
+  const [aiInterviewResult, setAiInterviewResult] = useState<CandidateAIInterviewSubmitResult | null>(null);
 
   const setTab = (tab: PortalTab) => {
     void router.replace(
@@ -146,6 +162,25 @@ export default function CandidatePortalPage() {
     };
   }, [loadPortal]);
 
+  const loadAssessmentForApp = async (appId: string) => {
+    setAssessmentLoading(true);
+    setAssessmentResult(null);
+    try {
+      const res = await authFetch(API.assessment(appId), { headers: { Accept: "application/json" } });
+      if (res.ok) {
+        const data = (await res.json()) as CandidateAssessmentData;
+        setAssessmentData(data);
+        setAssessmentAnswers({});
+      } else {
+        setAssessmentData(null);
+      }
+    } catch {
+      setAssessmentData(null);
+    } finally {
+      setAssessmentLoading(false);
+    }
+  };
+
   const openApplication = async (applicationId: string) => {
     setActionError(null);
     const response = await authFetch(API.application(applicationId), {
@@ -156,8 +191,89 @@ export default function CandidatePortalPage() {
       setActionError(parseApiError(payload, "Unable to load application details"));
       return;
     }
-    setSelectedApplication((await response.json()) as CandidateApplication);
+    const app = (await response.json()) as CandidateApplication;
+    setSelectedApplication(app);
     setTab("applications");
+    void loadAssessmentForApp(applicationId);
+    void loadAIInterviewForApp(applicationId);
+  };
+
+  const loadAIInterviewForApp = async (appId: string) => {
+    setAiInterviewLoading(true);
+    try {
+      const res = await authFetch(API.aiInterview(appId), { headers: { Accept: "application/json" } });
+      if (res.ok) {
+        const data = (await res.json()) as CandidateAIInterviewData;
+        setAiInterviewData(data);
+        setAiInterviewAnswers({});
+      } else {
+        setAiInterviewData(null);
+      }
+    } catch {
+      setAiInterviewData(null);
+    } finally {
+      setAiInterviewLoading(false);
+    }
+  };
+
+  const handleSubmitAssessment = async () => {
+    if (!selectedApplication) return;
+    setAssessmentSubmitting(true);
+    setActionError(null);
+    try {
+      const res = await authFetch(API.submitAssessment(selectedApplication.id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ answers: assessmentAnswers }),
+      });
+      const payload = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+      if (!res.ok) {
+        throw new Error(parseApiError(payload, "Unable to submit assessment"));
+      }
+      const result = payload as unknown as AssessmentSubmitResult;
+      setAssessmentResult(result);
+      setActionMessage(`Assessment submitted successfully! You scored ${result.score}%.`);
+      await loadPortal({ showLoading: false, clearSelection: false, clearActionFeedback: false });
+      const refreshedApp = await authFetch(API.application(selectedApplication.id), { headers: { Accept: "application/json" } });
+      if (refreshedApp.ok) {
+        setSelectedApplication((await refreshedApp.json()) as CandidateApplication);
+      }
+      await loadAssessmentForApp(selectedApplication.id);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Unable to submit assessment");
+    } finally {
+      setAssessmentSubmitting(false);
+    }
+  };
+
+  const handleSubmitAIInterview = async () => {
+    if (!selectedApplication) return;
+    setAiInterviewSubmitting(true);
+    setActionError(null);
+    try {
+      const res = await authFetch(API.submitAIInterview(selectedApplication.id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ answers: aiInterviewAnswers }),
+      });
+      const payload = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+      if (!res.ok) {
+        throw new Error(parseApiError(payload, "Unable to submit AI interview"));
+      }
+      const result = payload as unknown as CandidateAIInterviewSubmitResult;
+      setAiInterviewResult(result);
+      setActionMessage(`AI Interview submitted successfully! You scored ${result.score}%.`);
+      await loadPortal({ showLoading: false, clearSelection: false, clearActionFeedback: false });
+      const refreshedApp = await authFetch(API.application(selectedApplication.id), { headers: { Accept: "application/json" } });
+      if (refreshedApp.ok) {
+        setSelectedApplication((await refreshedApp.json()) as CandidateApplication);
+      }
+      await loadAIInterviewForApp(selectedApplication.id);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Unable to submit AI interview");
+    } finally {
+      setAiInterviewSubmitting(false);
+    }
   };
 
   const openInterview = async (interviewId: string) => {
@@ -460,7 +576,8 @@ export default function CandidatePortalPage() {
                     )}
 
                     {selectedApplication ? (
-                      <Section elevated>
+                      <>
+                        <Section elevated>
                         <Stack gap="2">
                           <strong>Application details</strong>
                           <p className="candidate-text-wrap">
@@ -474,7 +591,238 @@ export default function CandidatePortalPage() {
                           {selectedApplication.source ? <p>Source: {selectedApplication.source}</p> : null}
                         </Stack>
                       </Section>
-                    ) : null}
+
+                      <Section elevated>
+                        <Stack gap="3">
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <strong>Role-Based Skills Screening Assessment</strong>
+                            {assessmentData?.status === "completed" || selectedApplication.assessment_score != null ? (
+                              <Badge tone={(selectedApplication.assessment_score ?? assessmentData?.score ?? 0) >= 60 ? "success" : "warning"}>
+                                Score: {selectedApplication.assessment_score ?? assessmentData?.score}%
+                              </Badge>
+                            ) : (
+                              <Badge tone="brand">Assessment Pending</Badge>
+                            )}
+                          </div>
+
+                          {assessmentLoading ? (
+                            <LoadingState title="Loading assessment..." />
+                          ) : null}
+
+                          {!assessmentLoading && (assessmentData?.status === "completed" || selectedApplication.assessment_score != null) ? (
+                            <Stack gap="2">
+                              <Alert
+                                tone={(selectedApplication.assessment_score ?? assessmentData?.score ?? 0) >= 60 ? "success" : "warning"}
+                                title={`Assessment Completed - Score: ${selectedApplication.assessment_score ?? assessmentData?.score}%`}
+                                description={
+                                  (selectedApplication.assessment_score ?? assessmentData?.score ?? 0) >= 60
+                                    ? "Great job! You have met the minimum screening score for this role."
+                                    : "Thank you for completing the assessment. Your score has been submitted to the recruiting team."
+                                }
+                              />
+                            </Stack>
+                          ) : null}
+
+                          {!assessmentLoading && assessmentData && assessmentData.status !== "completed" && selectedApplication.assessment_score == null ? (
+                            <Stack gap="3">
+                              <p style={{ color: "var(--color-text-secondary, #64748b)" }}>
+                                Please complete the screening questions below for <strong>{selectedApplication.job_title}</strong>. Select your answer for each question and click Submit.
+                              </p>
+
+                              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                                {assessmentData.questions.map((q, qIndex) => (
+                                  <div
+                                    key={q.id}
+                                    style={{
+                                      border: "1px solid var(--color-border, #e2e8f0)",
+                                      borderRadius: "8px",
+                                      padding: "1rem",
+                                      background: "var(--color-surface, #ffffff)",
+                                    }}
+                                  >
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                      <strong>Question {qIndex + 1}: {q.question}</strong>
+                                      {q.skill_tag ? <Badge tone="neutral">{q.skill_tag}</Badge> : null}
+                                    </div>
+
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.5rem", marginTop: "0.75rem" }}>
+                                      {Object.entries(q.options).map(([optKey, optText]) => {
+                                        const isSelected = assessmentAnswers[q.id] === optKey;
+                                        return (
+                                          <button
+                                            key={optKey}
+                                            type="button"
+                                            onClick={() =>
+                                              setAssessmentAnswers((prev) => ({
+                                                ...prev,
+                                                [q.id]: optKey,
+                                              }))
+                                            }
+                                            style={{
+                                              textAlign: "left",
+                                              padding: "0.6rem 0.8rem",
+                                              borderRadius: "6px",
+                                              border: isSelected
+                                                ? "2px solid var(--color-primary, #3b82f6)"
+                                                : "1px solid var(--color-border, #cbd5e1)",
+                                              background: isSelected
+                                                ? "rgba(59, 130, 246, 0.08)"
+                                                : "var(--color-bg, #ffffff)",
+                                              cursor: "pointer",
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: "0.5rem",
+                                            }}
+                                          >
+                                            <span
+                                              style={{
+                                                fontWeight: "bold",
+                                                color: isSelected ? "var(--color-primary, #3b82f6)" : "inherit",
+                                              }}
+                                            >
+                                              {optKey}.
+                                            </span>
+                                            <span>{optText}</span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
+                                <Button
+                                  variant="primary"
+                                  disabled={
+                                    assessmentSubmitting ||
+                                    Object.keys(assessmentAnswers).length < (assessmentData?.questions?.length || 1)
+                                  }
+                                  onClick={() => void handleSubmitAssessment()}
+                                >
+                                  {assessmentSubmitting ? "Submitting Assessment..." : "Submit Assessment"}
+                                </Button>
+                              </div>
+                            </Stack>
+                          ) : null}
+                        </Stack>
+                      </Section>
+
+                      <Section elevated>
+                        <Stack gap="3">
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <strong>Role-Based AI-Guided Interview</strong>
+                            {aiInterviewData?.status === "completed" || selectedApplication.interview_score != null ? (
+                              <Badge tone={(selectedApplication.interview_score ?? aiInterviewData?.score ?? 0) >= 60 ? "success" : "warning"}>
+                                Interview Score: {selectedApplication.interview_score ?? aiInterviewData?.score}%
+                              </Badge>
+                            ) : (
+                              <Badge tone="brand">Interview Ready</Badge>
+                            )}
+                          </div>
+
+                          {aiInterviewLoading ? (
+                            <LoadingState title="Loading AI interview..." />
+                          ) : null}
+
+                          {!aiInterviewLoading && (aiInterviewData?.status === "completed" || selectedApplication.interview_score != null) ? (
+                            <Stack gap="2">
+                              <Alert
+                                tone={(selectedApplication.interview_score ?? aiInterviewData?.score ?? 0) >= 70 ? "success" : "warning"}
+                                title={`AI Interview Completed — Score: ${selectedApplication.interview_score ?? aiInterviewData?.score}%`}
+                                description={
+                                  (aiInterviewData?.evaluation?.overall_feedback as string | undefined) ||
+                                  "Thank you for completing your AI interview. Your structured responses and synthesized evaluation have been recorded for the recruiting team."
+                                }
+                              />
+                              {Array.isArray(aiInterviewData?.evaluation?.key_strengths) && aiInterviewData.evaluation.key_strengths.length > 0 ? (
+                                <div>
+                                  <small style={{ fontWeight: 600, color: "var(--color-text-secondary, #64748b)" }}>
+                                    Key Strengths:
+                                  </small>
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.25rem" }}>
+                                    {aiInterviewData.evaluation.key_strengths.map((s: string, idx: number) => (
+                                      <Badge key={idx} tone="success">
+                                        {s}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </Stack>
+                          ) : null}
+
+                          {!aiInterviewLoading && aiInterviewData && aiInterviewData.status !== "completed" && selectedApplication.interview_score == null ? (
+                            <Stack gap="3">
+                              <p style={{ color: "var(--color-text-secondary, #64748b)" }}>
+                                Please provide thoughtful, detailed answers to the structured interview questions below for <strong>{selectedApplication.job_title}</strong>. Your responses will be objectively evaluated by the AI Copilot.
+                              </p>
+
+                              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                                {aiInterviewData.questions.map((q, qIndex) => (
+                                  <div
+                                    key={q.id}
+                                    style={{
+                                      border: "1px solid var(--color-border, #e2e8f0)",
+                                      borderRadius: "8px",
+                                      padding: "1rem",
+                                      background: "var(--color-surface, #ffffff)",
+                                    }}
+                                  >
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                      <strong>
+                                        Question {qIndex + 1}: {q.question}
+                                      </strong>
+                                      <Badge tone="neutral">{q.competency || q.category}</Badge>
+                                    </div>
+                                    {q.context ? (
+                                      <small style={{ color: "var(--color-text-secondary, #64748b)", display: "block", marginBottom: "0.5rem" }}>
+                                        {q.context}
+                                      </small>
+                                    ) : null}
+                                    <textarea
+                                      rows={4}
+                                      placeholder="Type your response here... (elaborate with specific technical and situational details)"
+                                      value={aiInterviewAnswers[q.id] || ""}
+                                      onChange={(e) =>
+                                        setAiInterviewAnswers((prev) => ({
+                                          ...prev,
+                                          [q.id]: e.target.value,
+                                        }))
+                                      }
+                                      style={{
+                                        width: "100%",
+                                        padding: "0.6rem",
+                                        borderRadius: "6px",
+                                        border: "1px solid var(--color-border, #cbd5e1)",
+                                        fontSize: "0.9rem",
+                                        fontFamily: "inherit",
+                                        resize: "vertical",
+                                      }}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
+                                <Button
+                                  variant="primary"
+                                  disabled={
+                                    aiInterviewSubmitting ||
+                                    Object.values(aiInterviewAnswers).filter((v) => v.trim().length > 0).length <
+                                      (aiInterviewData?.questions?.length || 1)
+                                  }
+                                  onClick={() => void handleSubmitAIInterview()}
+                                >
+                                  {aiInterviewSubmitting ? "Submitting Interview..." : "Submit Interview Responses"}
+                                </Button>
+                              </div>
+                            </Stack>
+                          ) : null}
+                        </Stack>
+                      </Section>
+                    </>
+                  ) : null}
                   </Stack>
                 </Tabs.Panel>
 

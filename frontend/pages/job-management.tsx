@@ -183,6 +183,8 @@ export default function JobManagementPage() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [bulkStatus, setBulkStatus] = useState<JobStatus>("open");
+  const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
+
 
   const loadJobs = useCallback(async () => {
     setLoading(true);
@@ -422,6 +424,29 @@ export default function JobManagementPage() {
     await loadJobs();
   };
 
+  const copyApplicationLink = async (jobId: string) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const url = `${origin}/apply/${jobId}`;
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      } else if (typeof document !== "undefined") {
+        const textarea = document.createElement("textarea");
+        textarea.value = url;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopiedJobId(jobId);
+      setTimeout(() => setCopiedJobId(null), 2500);
+    } catch {
+      setCopiedJobId(jobId);
+      setTimeout(() => setCopiedJobId(null), 2500);
+    }
+  };
+
+
   const togglePageSelection = (checked: boolean) => {
     if (checked) {
       setSelectedIds((prev) => Array.from(new Set([...prev, ...pagedJobs.map((job) => job.id)])));
@@ -596,6 +621,32 @@ export default function JobManagementPage() {
                       header: "Updated",
                       render: (row: JobRecord) => formatDate(row.updated_at ?? row.created_at),
                     },
+                    {
+                      key: "apply_link",
+                      header: "Apply Link",
+                      render: (row: JobRecord) => {
+                        const isOpen = String(row.status).toLowerCase() === "open";
+                        if (!isOpen) {
+                          return (
+                            <span style={{ fontSize: "0.75rem", color: "var(--color-text-muted, #94a3b8)" }}>
+                              Not open
+                            </span>
+                          );
+                        }
+                        return (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void copyApplicationLink(row.id);
+                            }}
+                          >
+                            {copiedJobId === row.id ? "Copied!" : "Copy Link"}
+                          </Button>
+                        );
+                      },
+                    },
                   ]}
                   data={pagedJobs}
                   rowKey="id"
@@ -632,6 +683,15 @@ export default function JobManagementPage() {
                     >
                       <div className="job-management-actions">
                         <Badge tone={statusTone(selectedJob.status)}>{selectedJob.status ?? "unknown"}</Badge>
+                        {String(selectedJob.status).toLowerCase() === "open" ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => void copyApplicationLink(selectedJob.id)}
+                          >
+                            {copiedJobId === selectedJob.id ? "Link Copied!" : "Copy Application Link"}
+                          </Button>
+                        ) : null}
                         {STATUS_OPTIONS.map((option) => (
                           <Button
                             key={option.value}

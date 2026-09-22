@@ -76,6 +76,7 @@ def create_interview(
 
 
 @router.get("", response_model=list[InterviewResponse])
+@router.get("/", response_model=list[InterviewResponse], include_in_schema=False)
 def list_interviews(
     current_user: User = Depends(get_current_user),
     service: InterviewService = Depends(get_interview_service),

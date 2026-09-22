@@ -86,6 +86,7 @@ def update_my_notification_preferences(
 
 
 @router.get("", response_model=NotificationListResponse)
+@router.get("/", response_model=NotificationListResponse, include_in_schema=False)
 def list_my_notifications(
     status_filter: NotificationStatus | None = Query(default=None, alias="status"),
     limit: int = Query(default=50, ge=1, le=500),

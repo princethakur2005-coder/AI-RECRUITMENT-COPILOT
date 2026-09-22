@@ -60,7 +60,7 @@ def test_alembic_has_single_head() -> None:
     )
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     assert len(heads) == 1
-    assert heads[0].startswith("m3n4o5p6q7r8")
+    assert heads[0].startswith("q7r8s9t0u1v2")
     assert heads[0].endswith("(head)")
 
 

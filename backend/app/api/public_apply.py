@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.repositories.application import ApplicationRepository
 from app.repositories.candidate import CandidateRepository
+from app.repositories.durable_job import DurableJobRepository
 from app.repositories.job import JobRepository
-from app.schemas.public_apply import PublicApplyForm, PublicApplyResponse
+from app.schemas.public_apply import PublicApplyForm, PublicApplyResponse, PublicJobDetailsResponse
+from app.services.durable_job_service import DurableJobService
 from app.services.public_apply import DuplicateApplicationError, PublicApplyService
 from app.utils.resume_management import ResumeManager
 
@@ -23,7 +25,28 @@ def get_public_apply_service(db: Session = Depends(get_db)) -> PublicApplyServic
         CandidateRepository(db),
         ApplicationRepository(db),
         ResumeManager(),
+        DurableJobService(DurableJobRepository(db)),
     )
+
+
+@router.get("/{job_id}", response_model=PublicJobDetailsResponse)
+def get_public_job(
+    job_id: UUID,
+    service: PublicApplyService = Depends(get_public_apply_service),
+) -> PublicJobDetailsResponse:
+    try:
+        return service.get_public_job(job_id)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to load job details",
+        ) from exc
+
 
 
 @router.post("/{job_id}/apply", response_model=PublicApplyResponse, status_code=status.HTTP_201_CREATED)

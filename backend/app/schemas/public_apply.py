@@ -23,3 +23,19 @@ class PublicApplyResponse(BaseModel):
     status: ApplicationStatus
     applied_at: datetime
     message: str = "Application submitted successfully"
+
+
+class PublicJobDetailsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    department: str | None = None
+    location: str | None = None
+    employment_type: str | None = None
+    experience_level: str | None = None
+    description: str | None = None
+    requirements: list[str] = Field(default_factory=list)
+    company_name: str | None = None
+    status: str = "open"
+

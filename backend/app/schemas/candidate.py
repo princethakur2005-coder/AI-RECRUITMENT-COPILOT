@@ -71,6 +71,25 @@ class CandidateResponse(CandidateBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    job_id: UUID | None = None
+    application_id: UUID | None = None
+    fit_score: float | None = None
+    assessment_score: float | None = None
+    assessment_breakdown: dict[str, Any] | None = None
+    interview_score: float | None = None
+    interview_feedback: dict[str, Any] | None = None
+    composite_score: float | None = None
+    hiring_decision: dict[str, Any] | None = None
+    final_recommendation: str | None = None
+    evaluation_summary: str | None = None
+    ai_evaluation_summary: str | None = None
+    recommendation_summary: str | None = None
+    hiring_recommendation_summary: str | None = None
+    resume_preview_url: str | None = None
+    resume_url: str | None = None
+    matched_skills: list[str] = Field(default_factory=list)
+    missing_skills: list[str] = Field(default_factory=list)
+    candidate_match_summary: str | None = None
     recruiter_notes: list[RecruiterNote] = Field(default_factory=list)
     timeline: CandidateTimelineResponse | None = None
     created_at: datetime

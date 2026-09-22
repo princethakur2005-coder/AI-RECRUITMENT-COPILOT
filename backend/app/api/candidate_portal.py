@@ -17,6 +17,16 @@ from app.repositories.job import JobRepository
 from app.repositories.offer import OfferRepository
 from app.repositories.notification import NotificationRepository
 from app.repositories.notification_preference import NotificationPreferenceRepository
+from app.schemas.ai_interview import (
+    CandidateInterviewResponse as AICandidateInterviewResponse,
+    CandidateInterviewSubmitRequest,
+    CandidateInterviewSubmitResponse,
+)
+from app.schemas.assessment import (
+    CandidateAssessmentResponse,
+    CandidateAssessmentSubmitRequest,
+    CandidateAssessmentSubmitResponse,
+)
 from app.schemas.candidate_portal import (
     CandidateApplicationResponse,
     CandidateInterviewResponse,
@@ -34,13 +44,23 @@ from app.schemas.notification_preference import (
     NotificationPreferenceUpdate,
 )
 from app.core.notification import NotificationStatus
+from app.services.ai_interview_service import AIInterviewService
 from app.services.application import ApplicationService
+from app.services.assessment_service import AssessmentService
 from app.services.interview_management import InterviewService
 from app.services.notification import NotificationService
 from app.services.notification_preference import NotificationPreferenceService
 from app.services.offer_service import OfferService
 
 router = APIRouter(prefix="/candidate", tags=["candidate-portal"])
+
+
+def get_assessment_service(db: Session = Depends(get_db)) -> AssessmentService:
+    return AssessmentService(db)
+
+
+def get_ai_interview_service(db: Session = Depends(get_db)) -> AIInterviewService:
+    return AIInterviewService(db)
 
 
 def get_notification_service(db: Session = Depends(get_db)) -> NotificationService:
@@ -245,3 +265,74 @@ def mark_my_notification_read(
     except Exception as exc:  # noqa: BLE001
         _handle_errors(exc)
         raise
+
+
+@router.get(
+    "/applications/{application_id}/assessment",
+    response_model=CandidateAssessmentResponse,
+)
+def get_my_application_assessment(
+    application_id: UUID,
+    current_candidate: Candidate = Depends(get_current_candidate),
+    service: AssessmentService = Depends(get_assessment_service),
+) -> CandidateAssessmentResponse:
+    try:
+        return service.get_candidate_assessment(application_id, current_candidate)
+    except Exception as exc:  # noqa: BLE001
+        _handle_errors(exc)
+        raise
+
+
+@router.post(
+    "/applications/{application_id}/assessment/submit",
+    response_model=CandidateAssessmentSubmitResponse,
+)
+def submit_my_application_assessment(
+    application_id: UUID,
+    payload: CandidateAssessmentSubmitRequest,
+    current_candidate: Candidate = Depends(get_current_candidate),
+    service: AssessmentService = Depends(get_assessment_service),
+) -> CandidateAssessmentSubmitResponse:
+    try:
+        return service.submit_candidate_assessment(
+            application_id, current_candidate, payload.answers
+        )
+    except Exception as exc:  # noqa: BLE001
+        _handle_errors(exc)
+        raise
+
+
+@router.get(
+    "/applications/{application_id}/interview",
+    response_model=AICandidateInterviewResponse,
+)
+def get_my_application_interview(
+    application_id: UUID,
+    current_candidate: Candidate = Depends(get_current_candidate),
+    service: AIInterviewService = Depends(get_ai_interview_service),
+) -> AICandidateInterviewResponse:
+    try:
+        return service.get_candidate_interview(application_id, current_candidate)
+    except Exception as exc:  # noqa: BLE001
+        _handle_errors(exc)
+        raise
+
+
+@router.post(
+    "/applications/{application_id}/interview/submit",
+    response_model=CandidateInterviewSubmitResponse,
+)
+def submit_my_application_interview(
+    application_id: UUID,
+    payload: CandidateInterviewSubmitRequest,
+    current_candidate: Candidate = Depends(get_current_candidate),
+    service: AIInterviewService = Depends(get_ai_interview_service),
+) -> CandidateInterviewSubmitResponse:
+    try:
+        return service.submit_candidate_interview(
+            application_id, current_candidate, payload.answers
+        )
+    except Exception as exc:  # noqa: BLE001
+        _handle_errors(exc)
+        raise
+
